@@ -51,7 +51,7 @@ class ComicSchemaTest {
 
     @Test
     void leavesFeelingsOutWhenTheyAreOff() {
-        var panel = child(child(child(child(ComicSchema.story(1, false), "properties"), "panels"), "items"),
+        var panel = child(child(child(child(ComicSchema.story(1, false, java.util.List.of()), "properties"), "panels"), "items"),
                 "properties");
 
         var character = child(child(panel, "characters"), "items");

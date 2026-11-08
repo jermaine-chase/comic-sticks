@@ -10,7 +10,15 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { ComicCharacter, EXPRESSIONS, Panel, POSES } from '../../models/comic.models';
+import {
+  CharacterDesign,
+  ComicCharacter,
+  EXPRESSIONS,
+  Panel,
+  Place,
+  POSES,
+} from '../../models/comic.models';
+import { PanelBackgroundComponent } from './panel-background.component';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
 import {
@@ -44,7 +52,7 @@ interface DrawnTail extends Tail {
  */
 @Component({
   selector: 'app-comic-panel',
-  imports: [StickFigureComponent, EditableTextDirective],
+  imports: [StickFigureComponent, EditableTextDirective, PanelBackgroundComponent],
   templateUrl: './comic-panel.component.html',
   styleUrl: './comic-panel.component.css',
 })
@@ -52,6 +60,18 @@ export class ComicPanelComponent {
   readonly panel = input.required<Panel>();
   readonly colorOf = input<(name: string) => string>(() => '#1b1b1f');
   readonly editable = input(true);
+  /** The character sheet. Every figure is drawn from its design, looked up by name. */
+  readonly designs = input<CharacterDesign[]>([]);
+  readonly places = input<Place[]>([]);
+
+  protected readonly designByName = computed(
+    () => new Map(this.designs().map((d) => [d.name, d] as const)),
+  );
+
+  /** The sheet place this panel is at, whose background is drawn. */
+  protected readonly place = computed(() =>
+    this.places().find((p) => p.name === this.panel().place),
+  );
 
   readonly captionChange = output<string>();
   readonly dialogueChange = output<{ index: number; text: string }>();

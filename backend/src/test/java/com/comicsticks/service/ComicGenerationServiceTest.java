@@ -12,6 +12,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +24,14 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.comicsticks.config.ComicProperties;
+import com.comicsticks.dto.Background;
+import com.comicsticks.dto.CharacterDesign;
+import com.comicsticks.dto.CharacterKind;
+import com.comicsticks.dto.CharacterSheet;
 import com.comicsticks.dto.ComicOptions;
+import com.comicsticks.dto.Ears;
+import com.comicsticks.dto.Hat;
+import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.support.TestProperties;
 import com.comicsticks.dto.Expression;
@@ -54,7 +62,7 @@ class ComicGenerationServiceTest {
     }
 
     private ComicStoryResponse generate(String text) {
-        return service.generate(text, NO_NOTES);
+        return service.generate(text, NO_NOTES, SHEET);
     }
 
     private static String panelJson(String characters, String dialogue) {
@@ -75,8 +83,59 @@ class ComicGenerationServiceTest {
                 TestProperties.llm("https://llm.test/v1", key), TestProperties.story(12));
         RestClient.Builder builder = RestClient.builder().baseUrl(properties.llm().baseUrl());
         server = MockRestServiceServer.bindTo(builder).build();
-        return new ComicGenerationService(properties, new StorySegmenter(properties), new PanelValidator(),
-                builder.build());
+        LlmClient llm = new LlmClient(properties, builder.build());
+        SheetRules rules = new SheetRules(properties);
+        return new ComicGenerationService(properties, new StorySegmenter(properties), new PanelValidator(), llm,
+                new LlmCharacterFinder(llm, rules, properties), rules);
+    }
+
+    /** A reviewed sheet, so most tests make no character pass call. */
+    private static final CharacterSheet SHEET = new CharacterSheet(
+            List.of(new CharacterDesign("Mia", "Mia: a girl who loves maps", CharacterKind.PERSON, null, Hat.CAP,
+                    null, null, null, null, null, false)),
+            List.of(new PlaceDto("The attic", "The room at the top of the house.", Background.ROOM)));
+
+    @Test
+    void runsTheCharacterPassFirstWhenThereIsNoSheetAndCountsItInTheEstimate() {
+        server.expect(requestTo(LLM_URL))
+                .andExpect(jsonPath("$.response_format.json_schema.name").value("character_sheet"))
+                .andRespond(withSuccess(chatReply("""
+                        {"characters":[{"name":"Mia","description":"Mia: a girl.","kind":"person","hat":"none",
+                          "hair":"long","accessory":"glasses","ears":"round","tail":"none","snout":"none"}],
+                         "places":[{"name":"The attic","description":"A dusty room.","background":"room"}]}""", "stop"),
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(LLM_URL))
+                .andExpect(jsonPath("$.messages[1].content").value(containsString("- Mia: a girl.")))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.properties.panels.items.properties"
+                        + ".place.enum[0]").value("The attic"))
+                .andRespond(withSuccess(chatReply(panelJson(MIA, "").replace("\"panelNumber\":1,",
+                        "\"panelNumber\":1,\"place\":\"the ATTIC\","), "stop"), MediaType.APPLICATION_JSON));
+
+        ComicStoryResponse story = service.generate("Mia sat in the attic.", NO_NOTES, CharacterSheet.EMPTY);
+
+        CharacterDesign mia = story.characters().getFirst();
+        assertThat(mia.ears()).as("a person has no animal ears").isEqualTo(Ears.NONE);
+        assertThat(mia.color()).isEqualTo("#1b1b1f");
+        assertThat(story.panels().getFirst().place()).isEqualTo("The attic");
+        assertThat(service.estimate("Mia sat.", NO_NOTES, false).estimatedSeconds())
+                .isEqualTo(service.estimate("Mia sat.", NO_NOTES, true).estimatedSeconds() + 5);
+        server.verify();
+    }
+
+    @Test
+    void drawsEveryCharacterFromTheSheetAndAddsAnyoneMissingFromIt() {
+        reply(panelJson("""
+                {"name":"MIA","pose":"waving","expression":"happy","facing":"right","feeling":""},
+                {"name":"Guard","pose":"standing","expression":"neutral","facing":"left","feeling":""}""",
+                "{\"speaker\":\"mia\",\"type\":\"thought\",\"text\":\"Hello.\"}"));
+
+        ComicStoryResponse story = generate("Mia met a guard.");
+
+        assertThat(story.panels().getFirst().characters()).extracting(c -> c.name()).containsExactly("Mia", "Guard");
+        assertThat(story.panels().getFirst().dialogue().getFirst().speaker()).isEqualTo("Mia");
+        assertThat(story.characters()).extracting(CharacterDesign::name).containsExactly("Mia", "Guard");
+        assertThat(story.characters().get(1).added()).isTrue();
+        assertThat(story.characters().getFirst().added()).isFalse();
     }
 
     @Test
@@ -152,7 +211,7 @@ class ComicGenerationServiceTest {
                 .andExpect(jsonPath("$.messages[0].content").value(not(containsString("- feeling:"))))
                 .andRespond(withSuccess(chatReply(panelJson(MIA, ""), "stop"), MediaType.APPLICATION_JSON));
 
-        var mia = service.generate("Mia froze.", new ComicOptions(SupportLevel.PARAGRAPH, false, false))
+        var mia = service.generate("Mia froze.", new ComicOptions(SupportLevel.PARAGRAPH, false, false), SHEET)
                 .panels().getFirst().characters().getFirst();
 
         assertThat(mia.feeling()).isEmpty();
@@ -172,7 +231,7 @@ class ComicGenerationServiceTest {
                                   {"phrase":"over the moon","meaning":"Very happy."}]}""", "stop"),
                         MediaType.APPLICATION_JSON));
 
-        var panel = service.generate(text, ComicOptions.DEFAULTS).panels().getFirst();
+        var panel = service.generate(text, ComicOptions.DEFAULTS, SHEET).panels().getFirst();
 
         assertThat(panel.notes()).extracting(n -> n.phrase()).containsExactly("her heart sank");
         assertThat(panel.notes().getFirst().meaning()).isEqualTo("She felt very disappointed. Her heart did not move.");
@@ -183,8 +242,8 @@ class ComicGenerationServiceTest {
     void estimateCountsTheNotesCallOnlyWhenNotesAreOn() {
         String story = "Mia found the old map in the attic.\n\nLeo followed it to the cave.";
 
-        assertThat(service.estimate(story, ComicOptions.DEFAULTS).estimatedSeconds()).isEqualTo(2 * (2 + 1) + 2 * 3);
-        assertThat(service.estimate(story, NO_NOTES).estimatedSeconds()).isEqualTo(2 * 2 + 2 * 3);
+        assertThat(service.estimate(story, ComicOptions.DEFAULTS, true).estimatedSeconds()).isEqualTo(2 * (2 + 1) + 2 * 3);
+        assertThat(service.estimate(story, NO_NOTES, true).estimatedSeconds()).isEqualTo(2 * 2 + 2 * 3);
     }
 
     private static String chatReply(String content, String finishReason) {
@@ -226,7 +285,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andExpect(jsonPath("$.messages[1].content").value(containsString(partTwo)))
                 .andExpect(jsonPath("$.messages[1].content").value(containsString("part 2 of 2")))
-                .andExpect(jsonPath("$.messages[1].content").value(containsString("Characters so far: Mia")))
+                .andExpect(jsonPath("$.messages[1].content").value(containsString("Character list (use these exact names):\n- Mia: a girl who loves maps")))
                 .andExpect(jsonPath("$.messages[1].content").value(containsString("how the story ends")))
                 .andRespond(withSuccess(chatReply(secondJson, "stop"), MediaType.APPLICATION_JSON));
 
@@ -295,7 +354,7 @@ class ComicGenerationServiceTest {
 
     @Test
     void estimateCountsPartsAndPanelsWithoutCallingTheLlm() {
-        var estimate = service.estimate("Mia found the old map in the attic.\n\nLeo followed it to the cave.", NO_NOTES);
+        var estimate = service.estimate("Mia found the old map in the attic.\n\nLeo followed it to the cave.", NO_NOTES, true);
 
         assertThat(estimate.parts()).isEqualTo(2);
         assertThat(estimate.panels()).isEqualTo(2);
@@ -319,7 +378,7 @@ class ComicGenerationServiceTest {
     void missingApiKeyIsAClearError() {
         ComicGenerationService noKey = serviceWithKey("");
 
-        assertThatThrownBy(() -> noKey.generate("x", ComicOptions.DEFAULTS))
+        assertThatThrownBy(() -> noKey.generate("x", ComicOptions.DEFAULTS, SHEET))
                 .isInstanceOfSatisfying(ComicGenerationException.class,
                         e -> assertThat(e.status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
     }

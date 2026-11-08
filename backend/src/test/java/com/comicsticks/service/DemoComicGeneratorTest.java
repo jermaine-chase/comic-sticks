@@ -6,7 +6,12 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.comicsticks.dto.Background;
+import com.comicsticks.dto.CharacterDesign;
 import com.comicsticks.dto.CharacterDto;
+import com.comicsticks.dto.CharacterKind;
+import com.comicsticks.dto.CharacterSheet;
+import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.ComicOptions;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.DialogueDto;
@@ -28,12 +33,14 @@ class DemoComicGeneratorTest {
             They walked home together and Mole felt proud.""";
 
     private final StorySegmenter segmenter = new StorySegmenter(TestProperties.properties(200));
-    private final DemoComicGenerator demo = new DemoComicGenerator(segmenter);
+    private final SheetRules rules = new SheetRules(TestProperties.properties(200));
+    private final DemoCharacterFinder finder = new DemoCharacterFinder(rules);
+    private final DemoComicGenerator demo = new DemoComicGenerator(segmenter, finder, rules);
     private final ComicStoryNormalizer normalizer = new ComicStoryNormalizer(TestProperties.properties(200));
     private final PanelValidator validator = new PanelValidator();
 
     private ComicStoryResponse generate(ComicOptions options) {
-        return normalizer.normalize(demo.generate(STORY, options));
+        return normalizer.normalize(demo.generate(STORY, options, CharacterSheet.EMPTY));
     }
 
     private static List<DialogueDto> dialogue(ComicStoryResponse story) {
@@ -71,6 +78,39 @@ class DemoComicGeneratorTest {
         assertThat(story.panels()).extracting(PanelDto::caption).contains("Later that night...");
         assertThat(story.panels().stream().flatMap(p -> p.notes().stream()))
                 .anySatisfy(n -> assertThat(n.phrase()).isEqualToIgnoringCase("Mole's heart sank"));
+    }
+
+    @Test
+    void buildsACharacterSheetAndDrawsEveryPanelFromIt() {
+        ComicStoryResponse story = generate(ComicOptions.DEFAULTS);
+
+        assertThat(story.characters()).extracting(CharacterDesign::name).containsExactly("Mole", "Ratty");
+        assertThat(story.characters()).allSatisfy(c -> {
+            assertThat(c.kind()).isEqualTo(CharacterKind.ANIMAL);
+            assertThat(c.color()).matches("#[0-9a-f]{6}");
+            assertThat(c.added()).isFalse();
+        });
+        assertThat(story.places()).extracting(PlaceDto::background).contains(Background.FOREST);
+        List<String> sheetNames = story.characters().stream().map(CharacterDesign::name).toList();
+        List<String> placeNames = story.places().stream().map(PlaceDto::name).toList();
+        assertThat(story.panels()).allSatisfy(p -> {
+            assertThat(p.characters()).extracting(CharacterDto::name).allMatch(sheetNames::contains);
+            assertThat(p.place().isEmpty() || placeNames.contains(p.place())).isTrue();
+        });
+        assertThat(story.panels().getFirst().place()).isEqualTo("The wood");
+    }
+
+    @Test
+    void usesAReviewedSheetInsteadOfFindingOneAgain() {
+        var reviewed = new CharacterSheet(
+                List.of(new CharacterDesign("Mole", "Mole: shy.", CharacterKind.ANIMAL, "#123456", null, null, null,
+                        null, null, null, false)),
+                List.of());
+
+        ComicStoryResponse story = normalizer.normalize(demo.generate(STORY, ComicOptions.DEFAULTS, reviewed));
+
+        assertThat(story.characters().getFirst().color()).isEqualTo("#123456");
+        assertThat(story.characters()).extracting(CharacterDesign::name).containsExactly("Mole");
     }
 
     @Test

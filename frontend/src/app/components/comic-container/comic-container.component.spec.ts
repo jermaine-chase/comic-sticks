@@ -1,7 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ComicEstimate, ComicStory } from '../../models/comic.models';
+import {
+  CharacterDesign,
+  CharacterSheet,
+  ComicEstimate,
+  ComicStory,
+} from '../../models/comic.models';
 import { ComicContainerComponent } from './comic-container.component';
 
 const STORY: ComicStory = {
@@ -24,6 +29,7 @@ const STORY: ComicStory = {
       dialogue: [{ speaker: 'Mia', text: '<b>Look!</b>', type: 'shout' }],
       sourceText: '',
       notes: [],
+      place: '',
     },
     {
       panelNumber: 2,
@@ -41,9 +47,31 @@ const STORY: ComicStory = {
       dialogue: [{ speaker: 'Leo', text: 'Hmm.', type: 'thought' }],
       sourceText: 'Mia pointed.\n"<b>Look!</b>" she shouted. Leo wondered.',
       notes: [{ phrase: 'Leo wondered', meaning: 'Leo was not sure, and thought about it.' }],
+      place: 'The attic',
     },
   ],
+  characters: [],
+  places: [{ name: 'The attic', description: 'A dusty room.', background: 'room' }],
 };
+
+const MIA: CharacterDesign = {
+  name: 'Mia',
+  description: 'Mia: a girl who loves maps.',
+  kind: 'person',
+  color: '#c8321f',
+  hat: 'cap',
+  hair: 'none',
+  accessory: 'glasses',
+  ears: 'none',
+  tail: 'none',
+  snout: 'none',
+  added: false,
+};
+const SHEET: CharacterSheet = {
+  characters: [MIA, { ...MIA, name: 'Leo', color: '#1f5fbf', hat: 'none', hair: 'curly' }],
+  places: STORY.places,
+};
+STORY.characters = SHEET.characters;
 
 const ESTIMATE: ComicEstimate = { parts: 3, panels: 8, estimatedSeconds: 41 };
 
@@ -87,8 +115,16 @@ describe('ComicContainerComponent', () => {
     button!.click();
   }
 
-  async function submitStory() {
+  /** Confirms the estimate and answers the character pass, stopping at the sheet review. */
+  async function reachSheet() {
     await reachConfirmation();
+    clickButton('Find the characters');
+    http.expectOne('/api/comics/characters').flush(SHEET);
+    await fixture.whenStable();
+  }
+
+  async function submitStory() {
+    await reachSheet();
     clickButton('Start drawing');
     return http.expectOne('/api/comics/generate');
   }
@@ -112,6 +148,7 @@ describe('ComicContainerComponent', () => {
       supportLevel: 1,
       feelingLabels: true,
       notes: true,
+      characterSheet: SHEET,
     });
 
     request.flush(STORY);

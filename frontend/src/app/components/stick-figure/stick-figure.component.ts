@@ -1,5 +1,7 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { Expression, Facing, Pose } from '../../models/comic.models';
+import { CharacterDesign, Expression, Facing, Pose } from '../../models/comic.models';
+import { FeatureLayers, featureLayers } from './stick-figure.features';
 import {
   EYE_PATHS,
   Face,
@@ -17,6 +19,7 @@ const FACE_INK = '#1b1b1f';
 /** A posable stick figure on an inline SVG canvas. */
 @Component({
   selector: 'app-stick-figure',
+  imports: [NgTemplateOutlet],
   styles: `
     :host {
       display: block;
@@ -37,7 +40,7 @@ const FACE_INK = '#1b1b1f';
     <svg viewBox="0 0 120 190" role="img" [attr.aria-label]="label">
       <g
         [attr.transform]="mirror"
-        [attr.stroke]="color"
+        [attr.stroke]="ink"
         fill="none"
         stroke-width="5"
         stroke-linecap="round"
@@ -49,8 +52,14 @@ const FACE_INK = '#1b1b1f';
         @if (skeleton.stool) {
           <path d="M34,142 H72 M42,142 L38,180 M64,142 L68,180" stroke="#8a6d3b" />
         }
+        <g class="features-back">
+          <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.back }" />
+        </g>
         <path [attr.d]="bodyPath" />
         <g [attr.transform]="headTransform">
+          <g class="features-head-back">
+            <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.headBack }" />
+          </g>
           <circle r="20" fill="#fffdf6" />
           <g class="face" [attr.stroke]="faceInk" stroke-width="2.5">
             @if (face.blush) {
@@ -86,8 +95,64 @@ const FACE_INK = '#1b1b1f';
               <path class="marks" [attr.d]="face.marks" stroke-width="2.5" />
             }
           </g>
+          <g class="features-head-front">
+            <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.headFront }" />
+          </g>
+        </g>
+        <g class="features-front">
+          <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.front }" />
         </g>
       </g>
+      <ng-template #shapes let-list>
+        @for (shape of list; track $index) {
+          @switch (shape.kind) {
+            @case ('path') {
+              <path
+                [attr.data-feature]="shape.name"
+                [attr.d]="shape.d"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+            @case ('circle') {
+              <circle
+                [attr.data-feature]="shape.name"
+                [attr.cx]="shape.cx"
+                [attr.cy]="shape.cy"
+                [attr.r]="shape.r"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+            @case ('ellipse') {
+              <ellipse
+                [attr.data-feature]="shape.name"
+                [attr.cx]="shape.cx"
+                [attr.cy]="shape.cy"
+                [attr.rx]="shape.rx"
+                [attr.ry]="shape.ry"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+            @case ('rect') {
+              <rect
+                [attr.data-feature]="shape.name"
+                [attr.x]="shape.x"
+                [attr.y]="shape.y"
+                [attr.width]="shape.width"
+                [attr.height]="shape.height"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+          }
+        }
+      </ng-template>
       @if (face.symbol) {
         <text
           class="symbol"
@@ -108,6 +173,16 @@ export class StickFigureComponent {
   @Input() facing: Facing = 'right';
   @Input() color = '#1b1b1f';
   @Input() name = 'Stick figure';
+  /** The character's fixed look from the sheet. Its colour wins over `color`. */
+  @Input() design: CharacterDesign | null = null;
+
+  protected get ink(): string {
+    return this.design?.color || this.color;
+  }
+
+  protected get features(): FeatureLayers {
+    return featureLayers(this.design, this.skeleton);
+  }
 
   protected readonly faceInk = FACE_INK;
   protected readonly tearPath = TEAR_PATH;

@@ -6,6 +6,9 @@
     [class]="'panel scene-' + p.scene"
     [attr.aria-label]="'Panel ' + p.panelNumber"
   >
+    @if (place(); as at) {
+      <app-panel-background [background]="at.background" [night]="p.scene === 'night'" />
+    }
     @if (p.caption || editable()) {
       <p
         class="caption"
@@ -60,6 +63,7 @@
             [expression]="character.expression"
             [facing]="facing()[characterIndex]"
             [color]="colorOf()(character.name)"
+            [design]="designByName().get(character.name) ?? null"
             [name]="character.name"
           />
           <span

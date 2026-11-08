@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Panel } from '../../models/comic.models';
+import { CharacterDesign, Panel } from '../../models/comic.models';
 import { ComicPanelComponent } from './comic-panel.component';
 
 const PANEL: Panel = {
@@ -17,6 +17,7 @@ const PANEL: Panel = {
   ],
   sourceText: '"Is anyone there?" whispered Mole. His heart sank.',
   notes: [{ phrase: 'His heart sank', meaning: 'He felt very disappointed.' }],
+  place: 'The river bank',
 };
 
 describe('ComicPanelComponent', () => {
@@ -81,5 +82,38 @@ describe('ComicPanelComponent', () => {
 
     expect(root.querySelector('[contenteditable]')).toBeNull();
     expect(root.querySelector('.actor-controls')).toBeNull();
+  });
+
+  it('draws each character from the sheet design and the place from its background', async () => {
+    const mole: CharacterDesign = {
+      name: 'Mole',
+      description: 'Mole: shy.',
+      kind: 'animal',
+      color: '#123456',
+      hat: 'none',
+      hair: 'none',
+      accessory: 'scarf',
+      ears: 'round',
+      tail: 'short',
+      snout: 'short',
+      added: false,
+    };
+    fixture.componentRef.setInput('designs', [mole]);
+    fixture.componentRef.setInput('places', [
+      { name: 'The river bank', description: '', background: 'riverbank' },
+    ]);
+    await fixture.whenStable();
+
+    const [moleFigure, ratFigure] = Array.from(root.querySelectorAll('app-stick-figure'));
+    expect(moleFigure.querySelector('svg > g')!.getAttribute('stroke')).toBe('#123456');
+    expect(moleFigure.querySelector('[data-feature="ears-round"]')).toBeTruthy();
+    expect(moleFigure.querySelector('[data-feature="accessory-scarf"]')).toBeTruthy();
+    expect(ratFigure.querySelector('[data-feature]')).toBeNull();
+    expect(root.querySelector('[data-background="riverbank"]')).toBeTruthy();
+  });
+
+  it('keeps the plain scene backdrop when the panel is at no sheet place', () => {
+    expect(root.querySelector('app-panel-background')).toBeNull();
+    expect(root.querySelector('.panel')!.classList).toContain('scene-outdoor');
   });
 });

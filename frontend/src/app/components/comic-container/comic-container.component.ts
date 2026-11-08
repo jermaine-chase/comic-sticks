@@ -3,6 +3,7 @@ import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import {
+  CharacterSheet,
   ComicCharacter,
   ComicEstimate,
   ComicOptions,
@@ -19,6 +20,7 @@ import {
   StorySource,
 } from '../../services/comic-api.service';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
+import { CharacterSheetComponent } from '../character-sheet/character-sheet.component';
 import { ComicPanelComponent } from '../comic-panel/comic-panel.component';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
 
@@ -36,7 +38,12 @@ function describeDuration(seconds: number): string {
 
 @Component({
   selector: 'app-comic-container',
-  imports: [StickFigureComponent, EditableTextDirective, ComicPanelComponent],
+  imports: [
+    StickFigureComponent,
+    EditableTextDirective,
+    ComicPanelComponent,
+    CharacterSheetComponent,
+  ],
   templateUrl: './comic-container.component.html',
   styleUrl: './comic-container.component.css',
 })
@@ -50,6 +57,9 @@ export class ComicContainerComponent {
   protected readonly checking = signal(false);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly finding = signal(false);
+  /** The character sheet, from the character pass, while it is reviewed. */
+  protected readonly sheet = signal<CharacterSheet | null>(null);
 
   protected readonly supportLevels = SUPPORT_LEVELS;
   protected readonly supportLevel = signal<SupportLevel>(DEFAULT_OPTIONS.supportLevel);
@@ -76,9 +86,15 @@ export class ComicContainerComponent {
     describeDuration(this.estimate()?.estimatedSeconds ?? 0),
   );
 
-  /** Each character keeps one colour across the comic, assigned by first appearance. */
+  /**
+   * Each character keeps one colour across the comic: the sheet's colour, or for anyone not on
+   * it, one assigned by first appearance.
+   */
   private readonly castColors = computed(() => {
     const colors = new Map<string, string>();
+    for (const design of this.story()?.characters ?? []) {
+      colors.set(design.name, design.color);
+    }
     for (const panel of this.story()?.panels ?? []) {
       for (const { name } of panel.characters) {
         if (!colors.has(name)) {
@@ -98,17 +114,21 @@ export class ComicContainerComponent {
     }
     this.error.set(null);
     this.estimate.set(null);
+    this.sheet.set(null);
     this.file.set(file);
   }
 
   protected removeFile(input: HTMLInputElement): void {
     input.value = '';
     this.estimate.set(null);
+    this.sheet.set(null);
     this.file.set(null);
   }
 
+  /** A different story has different characters, so the sheet is found again. */
   protected onStoryInput(text: string): void {
     this.estimate.set(null);
+    this.sheet.set(null);
     this.storyText.set(text);
   }
 
@@ -145,13 +165,31 @@ export class ComicContainerComponent {
 
   protected cancelEstimate(): void {
     this.estimate.set(null);
+    this.sheet.set(null);
   }
 
+  /** Second step: the character pass, whose sheet is shown for review before drawing. */
+  protected findCharacters(): void {
+    this.finding.set(true);
+    this.error.set(null);
+    this.api
+      .characters(this.storySource())
+      .pipe(
+        finalize(() => this.finding.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (sheet) => this.sheet.set(sheet),
+        error: (e: HttpErrorResponse) => this.error.set(errorMessage(e)),
+      });
+  }
+
+  /** Last step: draws every panel from the reviewed sheet. */
   protected generate(): void {
     this.loading.set(true);
     this.error.set(null);
     this.api
-      .generate(this.storySource(), this.options())
+      .generate(this.storySource(), this.options(), this.sheet())
       .pipe(
         finalize(() => {
           this.loading.set(false);
@@ -160,7 +198,10 @@ export class ComicContainerComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: (story) => this.story.set(story),
+        next: (story) => {
+          this.story.set(story);
+          this.sheet.set(null);
+        },
         error: (e: HttpErrorResponse) => this.error.set(errorMessage(e)),
       });
   }

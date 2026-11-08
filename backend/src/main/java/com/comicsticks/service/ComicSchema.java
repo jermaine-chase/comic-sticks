@@ -30,14 +30,16 @@ final class ComicSchema {
     }
 
     static Map<String, Object> story(int maxPanels) {
-        return story(maxPanels, true);
+        return story(maxPanels, true, List.of());
     }
 
     /**
      * @param feelings whether each character carries a feeling word. It comes before the face, so
      *                 the model names the feeling first and then draws it.
+     * @param places   the names of the places on the character sheet. When there are any, each panel
+     *                 names its place from this list, or "" for somewhere else.
      */
-    static Map<String, Object> story(int maxPanels, boolean feelings) {
+    static Map<String, Object> story(int maxPanels, boolean feelings, List<String> places) {
         List<Object> characterFields = new ArrayList<>(List.of("name", string()));
         if (feelings) {
             characterFields.addAll(List.of("feeling", string()));
@@ -54,12 +56,18 @@ final class ComicSchema {
                 "type", enumOf(DialogueType.values()),
                 "text", string());
 
-        Map<String, Object> panel = object(
-                "panelNumber", Map.of("type", "integer"),
+        List<Object> panelFields = new ArrayList<>(List.of("panelNumber", Map.of("type", "integer")));
+        if (!places.isEmpty()) {
+            List<String> choices = new ArrayList<>(places);
+            choices.add("");
+            panelFields.addAll(List.of("place", Map.of("type", "string", "enum", choices)));
+        }
+        panelFields.addAll(List.of(
                 "scene", enumOf(Scene.values()),
                 "caption", string(),
                 "characters", arrayOf(character, 1, MAX_CHARACTERS_PER_PANEL),
-                "dialogue", arrayOf(dialogue, 0, MAX_LINES_PER_PANEL));
+                "dialogue", arrayOf(dialogue, 0, MAX_LINES_PER_PANEL)));
+        Map<String, Object> panel = object(panelFields.toArray());
 
         return object(
                 "title", string(),
@@ -75,7 +83,7 @@ final class ComicSchema {
     }
 
     /** Builds an object schema from alternating property names and schemas, keeping their order. */
-    private static Map<String, Object> object(Object... namesAndSchemas) {
+    static Map<String, Object> object(Object... namesAndSchemas) {
         Map<String, Object> properties = new LinkedHashMap<>();
         for (int i = 0; i < namesAndSchemas.length; i += 2) {
             properties.put((String) namesAndSchemas[i], namesAndSchemas[i + 1]);
@@ -88,15 +96,15 @@ final class ComicSchema {
         return schema;
     }
 
-    private static Map<String, Object> string() {
+    static Map<String, Object> string() {
         return Map.of("type", "string");
     }
 
-    private static Map<String, Object> arrayOf(Map<String, Object> items, int minItems, int maxItems) {
+    static Map<String, Object> arrayOf(Map<String, Object> items, int minItems, int maxItems) {
         return Map.of("type", "array", "items", items, "minItems", minItems, "maxItems", maxItems);
     }
 
-    private static Map<String, Object> enumOf(Enum<?>[] constants) {
+    static Map<String, Object> enumOf(Enum<?>[] constants) {
         return Map.of("type", "string", "enum", wireValues(constants));
     }
 

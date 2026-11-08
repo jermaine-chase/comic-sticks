@@ -47,7 +47,8 @@ public class ComicStoryNormalizer {
             throw new ComicGenerationException(HttpStatus.BAD_GATEWAY,
                     "No comic panels came back for that story. Please try again.");
         }
-        return new ComicStoryResponse(textOr(story.title(), DEFAULT_TITLE), panels);
+        return new ComicStoryResponse(textOr(story.title(), DEFAULT_TITLE), panels,
+                listOf(story.characters()), listOf(story.places()));
     }
 
     private static PanelDto normalizePanel(PanelDto panel, int number) {
@@ -78,7 +79,7 @@ public class ComicStoryNormalizer {
 
         return new PanelDto(number, panel.scene() == null ? Scene.PLAIN : panel.scene(),
                 text(panel.caption()), characters, dialogue, panel.sourceText() == null ? "" : panel.sourceText(),
-                notes);
+                notes, text(panel.place()));
     }
 
     private static CharacterDto normalizeCharacter(CharacterDto c) {

@@ -1,0 +1,188 @@
+<section class="sheet" aria-label="Character sheet">
+  <h2 class="sheet-title">Who's in the story</h2>
+  <p class="hint">Check each character's look. Every panel will draw them exactly like this.</p>
+
+  <ul class="cards">
+    @for (character of sheet().characters; track $index; let i = $index) {
+      <li class="card" [class.card-added]="character.added">
+        <app-stick-figure
+          class="preview"
+          [name]="character.name"
+          [design]="character"
+          expression="happy"
+        />
+        <div class="fields">
+          <label>
+            Name
+            <input
+              name="character-name"
+              [value]="character.name"
+              (change)="updateCharacter(i, { name: value($event).trim() || character.name })"
+            />
+          </label>
+          <label>
+            Who they are
+            <input
+              name="character-description"
+              [value]="character.description"
+              (change)="updateCharacter(i, { description: value($event) })"
+            />
+          </label>
+          <div class="row">
+            <label>
+              Kind
+              <select name="kind" (change)="updateCharacter(i, { kind: $any(value($event)) })">
+                @for (kind of kinds; track kind) {
+                  <option [value]="kind" [selected]="kind === character.kind">{{ kind }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              Colour
+              <input
+                type="color"
+                name="color"
+                [value]="character.color"
+                (change)="updateCharacter(i, { color: value($event) })"
+              />
+            </label>
+          </div>
+          <div class="row">
+            <label>
+              Hat
+              <select name="hat" (change)="updateCharacter(i, { hat: $any(value($event)) })">
+                @for (option of hats; track option) {
+                  <option [value]="option" [selected]="option === character.hat">
+                    {{ label(option) }}
+                  </option>
+                }
+              </select>
+            </label>
+            <label>
+              Hair
+              <select name="hair" (change)="updateCharacter(i, { hair: $any(value($event)) })">
+                @for (option of hairs; track option) {
+                  <option [value]="option" [selected]="option === character.hair">
+                    {{ label(option) }}
+                  </option>
+                }
+              </select>
+            </label>
+            <label>
+              Wears or carries
+              <select
+                name="accessory"
+                (change)="updateCharacter(i, { accessory: $any(value($event)) })"
+              >
+                @for (option of accessories; track option) {
+                  <option [value]="option" [selected]="option === character.accessory">
+                    {{ label(option) }}
+                  </option>
+                }
+              </select>
+            </label>
+          </div>
+          @if (character.kind === 'animal') {
+            <div class="row">
+              <label>
+                Ears
+                <select name="ears" (change)="updateCharacter(i, { ears: $any(value($event)) })">
+                  @for (option of ears; track option) {
+                    <option [value]="option" [selected]="option === character.ears">
+                      {{ label(option) }}
+                    </option>
+                  }
+                </select>
+              </label>
+              <label>
+                Tail
+                <select name="tail" (change)="updateCharacter(i, { tail: $any(value($event)) })">
+                  @for (option of tails; track option) {
+                    <option [value]="option" [selected]="option === character.tail">
+                      {{ label(option) }}
+                    </option>
+                  }
+                </select>
+              </label>
+              <label>
+                Snout
+                <select name="snout" (change)="updateCharacter(i, { snout: $any(value($event)) })">
+                  @for (option of snouts; track option) {
+                    <option [value]="option" [selected]="option === character.snout">
+                      {{ label(option) }}
+                    </option>
+                  }
+                </select>
+              </label>
+            </div>
+          }
+          @if (character.added) {
+            <p class="added-note">Added while drawing. Check this look.</p>
+          }
+        </div>
+        <button
+          type="button"
+          class="remove"
+          [attr.aria-label]="'Remove ' + character.name"
+          (click)="removeCharacter(i)"
+        >
+          &times;
+        </button>
+      </li>
+    }
+  </ul>
+  <button type="button" class="button button-secondary" (click)="addCharacter()">
+    Add a character
+  </button>
+
+  <h2 class="sheet-title">Places</h2>
+  <ul class="cards">
+    @for (place of sheet().places; track $index; let i = $index) {
+      <li class="card place-card">
+        <div class="place-preview">
+          <app-panel-background [background]="place.background" />
+        </div>
+        <div class="fields">
+          <label>
+            Name
+            <input
+              name="place-name"
+              [value]="place.name"
+              (change)="updatePlace(i, { name: value($event).trim() || place.name })"
+            />
+          </label>
+          <label>
+            What it is
+            <input
+              name="place-description"
+              [value]="place.description"
+              (change)="updatePlace(i, { description: value($event) })"
+            />
+          </label>
+          <label>
+            Background
+            <select
+              name="background"
+              (change)="updatePlace(i, { background: $any(value($event)) })"
+            >
+              @for (option of backgrounds; track option) {
+                <option [value]="option" [selected]="option === place.background">
+                  {{ label(option) }}
+                </option>
+              }
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          class="remove"
+          [attr.aria-label]="'Remove ' + place.name"
+          (click)="removePlace(i)"
+        >
+          &times;
+        </button>
+      </li>
+    }
+  </ul>
+  <button type="button" class="button button-secondary" (click)="addPlace()">Add a place</button>
+</section>

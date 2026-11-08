@@ -74,12 +74,108 @@ export interface Panel {
   /** The book's own words for this panel, exactly as written. Empty when a later panel has them. */
   sourceText: string;
   notes: Note[];
+  /** The name of a place on the sheet, whose background is drawn. Empty when none. */
+  place: string;
 }
 
 export interface ComicStory {
   title: string;
   panels: Panel[];
+  /** The character sheet every figure is drawn from. */
+  characters: CharacterDesign[];
+  places: Place[];
 }
+
+// --- Character sheet: matches the Java enums CharacterKind, Hat, Hair, Accessory, Ears,
+// AnimalTail, Snout and Background. ---------------------------------------------------------
+
+export const KINDS = ['person', 'animal'] as const;
+export type CharacterKind = (typeof KINDS)[number];
+
+export const HATS = [
+  'none',
+  'cap',
+  'top_hat',
+  'bowler',
+  'crown',
+  'witch_hat',
+  'beanie',
+  'straw_hat',
+] as const;
+export type Hat = (typeof HATS)[number];
+
+export const HAIRS = ['none', 'short', 'spiky', 'long', 'curly', 'ponytail', 'bun'] as const;
+export type Hair = (typeof HAIRS)[number];
+
+export const ACCESSORIES = [
+  'none',
+  'bow',
+  'glasses',
+  'beard',
+  'cape',
+  'scarf',
+  'pocket_watch',
+  'bag',
+  'whiskers',
+] as const;
+export type Accessory = (typeof ACCESSORIES)[number];
+
+export const EARS = ['none', 'round', 'pointy', 'long', 'floppy'] as const;
+export type Ears = (typeof EARS)[number];
+
+export const TAILS = ['none', 'long', 'bushy', 'curly', 'short'] as const;
+export type AnimalTail = (typeof TAILS)[number];
+
+export const SNOUTS = ['none', 'short', 'long', 'beak'] as const;
+export type Snout = (typeof SNOUTS)[number];
+
+export const BACKGROUNDS = [
+  'plain',
+  'room',
+  'burrow',
+  'cave',
+  'forest',
+  'field',
+  'riverbank',
+  'garden',
+  'town',
+  'castle',
+  'school',
+  'beach',
+  'boat',
+] as const;
+export type Background = (typeof BACKGROUNDS)[number];
+
+/** A main character's fixed look. Every panel draws the character from this, by name. */
+export interface CharacterDesign {
+  name: string;
+  /** One plain line, such as "Mole: a shy, kind animal who lives underground". */
+  description: string;
+  kind: CharacterKind;
+  color: string;
+  hat: Hat;
+  hair: Hair;
+  accessory: Accessory;
+  ears: Ears;
+  tail: AnimalTail;
+  snout: Snout;
+  /** Not on the reviewed sheet: a panel named them, so they got a plain default design. */
+  added: boolean;
+}
+
+export interface Place {
+  name: string;
+  description: string;
+  background: Background;
+}
+
+export interface CharacterSheet {
+  characters: CharacterDesign[];
+  places: Place[];
+}
+
+/** Turns an enum value such as "top_hat" into a label such as "top hat". */
+export const label = (value: string) => value.replace(/_/g, ' ');
 
 /** 1: a panel per paragraph. 2: a panel per 3 to 4 paragraphs. 3: a panel per scene. */
 export type SupportLevel = 1 | 2 | 3;

@@ -1,0 +1,124 @@
+:host {
+  display: block;
+}
+
+.sheet {
+  max-width: 980px;
+  margin: 0 auto 1.5rem;
+  padding: 1rem;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.sheet-title {
+  margin: 0.25rem 0;
+  font: 400 1.6rem var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.hint {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.6rem;
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
+.card-added {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+
+.preview {
+  flex: none;
+  width: 80px;
+  height: 126px;
+  margin-top: 1.4rem;
+}
+
+.place-preview {
+  position: relative;
+  flex: none;
+  width: 90px;
+  height: 90px;
+  border: 2px solid var(--ink);
+}
+
+.fields {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font: 700 0.85rem var(--font-reading);
+}
+
+input,
+select {
+  font: 0.95rem var(--font-reading);
+  padding: 0.15rem 0.3rem;
+  border: 1.5px solid var(--ink);
+  background: #fff;
+}
+
+input[type='color'] {
+  width: 3rem;
+  height: 1.9rem;
+  padding: 0;
+}
+
+.added-note {
+  margin: 0;
+  color: var(--accent);
+  font: 700 0.85rem var(--font-reading);
+}
+
+.remove {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.3rem;
+  font-size: 1.3rem;
+  line-height: 1;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.button {
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  color: var(--ink);
+  font: 400 1.1rem var(--font-display);
+  letter-spacing: 0.05em;
+  background: var(--highlight);
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+}

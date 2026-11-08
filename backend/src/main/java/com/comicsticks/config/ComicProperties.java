@@ -5,7 +5,7 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("comic")
-public record ComicProperties(Llm llm, Story story) {
+public record ComicProperties(Llm llm, Story story, Characters characters) {
 
     public record Llm(
             String baseUrl,
@@ -15,7 +15,18 @@ public record ComicProperties(Llm llm, Story story) {
             int maxOutputTokens,
             double secondsPerPart,
             double secondsPerPanel,
-            double secondsPerNotesCall) {
+            double secondsPerNotesCall,
+            double secondsPerCharacterChunk) {
+    }
+
+    /**
+     * The character pass, which builds the character sheet before any panel is drawn.
+     *
+     * @param chunkChars    the story is read in pieces of about this size, one LLM call each
+     * @param maxCharacters most characters on a sheet
+     * @param maxPlaces     most places on a sheet
+     */
+    public record Characters(int chunkChars, int maxCharacters, int maxPlaces) {
     }
 
     /**

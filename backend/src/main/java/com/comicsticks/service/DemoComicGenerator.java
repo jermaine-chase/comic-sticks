@@ -11,7 +11,9 @@ import java.util.regex.Pattern;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import com.comicsticks.dto.CharacterDesign;
 import com.comicsticks.dto.CharacterDto;
+import com.comicsticks.dto.CharacterSheet;
 import com.comicsticks.dto.ComicEstimateResponse;
 import com.comicsticks.dto.ComicOptions;
 import com.comicsticks.dto.ComicStoryResponse;
@@ -21,6 +23,7 @@ import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.Facing;
 import com.comicsticks.dto.NoteDto;
 import com.comicsticks.dto.PanelDto;
+import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.Scene;
 import com.comicsticks.service.StorySegmenter.Part;
@@ -47,10 +50,6 @@ public class DemoComicGenerator implements ComicGenerator {
 
     private static final Pattern SENTENCE = Pattern.compile("[^.!?]+[.!?]+[\"”']?|[^.!?]+$");
     private static final Pattern QUOTE = Pattern.compile("[\"“]([^\"”]+)[\"”]");
-    private static final Pattern NAME = Pattern.compile("\\b[A-Z][a-z]{2,}\\b");
-    private static final List<String> NOT_NAMES = List.of("The", "Then", "When", "She", "They", "But",
-            "And", "Once", "That", "There", "This", "His", "Her", "After", "Before", "Suddenly", "Chapter",
-            "Later", "Meanwhile", "Back", "Soon", "What", "Where", "Why", "How", "Yes", "Look", "Come");
     private static final Pattern WHISPERED = Pattern.compile("(?i)\\bwhisper(ed|s|ing)?\\b");
     private static final Pattern SHOUTED = Pattern.compile("(?i)\\b(shout|yell|scream|cr(y|ie))(ed|s|ing)?\\b");
     private static final Pattern SCENE_CHANGE = Pattern.compile(
@@ -90,32 +89,65 @@ public class DemoComicGenerator implements ComicGenerator {
     private static final Pose[] POSES = {Pose.STANDING, Pose.WALKING, Pose.POINTING, Pose.WAVING, Pose.THINKING,
             Pose.SITTING};
 
-    private final StorySegmenter segmenter;
+    private static final int MAX_CAST_PER_PANEL = 3;
 
-    public DemoComicGenerator(StorySegmenter segmenter) {
+    private final StorySegmenter segmenter;
+    private final CharacterFinder finder;
+    private final SheetRules sheetRules;
+
+    public DemoComicGenerator(StorySegmenter segmenter, CharacterFinder finder, SheetRules sheetRules) {
         this.segmenter = segmenter;
+        this.finder = finder;
+        this.sheetRules = sheetRules;
     }
 
     @Override
-    public ComicEstimateResponse estimate(String storyText, ComicOptions options) {
+    public ComicEstimateResponse estimate(String storyText, ComicOptions options, boolean hasSheet) {
         List<Part> parts = segmenter.split(storyText, options.supportLevel());
         return new ComicEstimateResponse(parts.size(), parts.stream().mapToInt(Part::panels).sum(), 1);
     }
 
     @Override
-    public ComicStoryResponse generate(String storyText, ComicOptions options) {
-        List<String> cast = findCast(storyText);
+    public ComicStoryResponse generate(String storyText, ComicOptions options, CharacterSheet suppliedSheet) {
+        CharacterSheet sheet = sheetRules.normalize(suppliedSheet == null || suppliedSheet.isEmpty()
+                ? finder.find(storyText) : suppliedSheet);
+        List<String> sheetNames = sheet.characters().stream().map(CharacterDesign::name).toList();
+        List<String> cast = sheetNames.isEmpty() ? List.of("Hero") : sheetNames.subList(0, 1);
+        String place = "";
         List<PanelDto> panels = new ArrayList<>();
         for (Part part : segmenter.split(storyText, options.supportLevel())) {
             List<String> groups = sentenceGroups(part.text(), part.panels());
             for (int g = 0; g < groups.size(); g++) {
+                String text = groups.get(g);
+                cast = castOf(text, sheetNames, cast);
+                place = placeOf(text, sheet.places(), place);
                 boolean last = g == groups.size() - 1;
                 List<NoteDto> notes = last && options.notes() ? notes(part.sourceText()) : List.of();
-                PanelDto panel = buildPanel(groups.get(g), panels.size(), cast, options);
-                panels.add(panel.withText(last ? part.sourceText() : "", notes));
+                PanelDto panel = buildPanel(text, panels.size(), cast, options);
+                panels.add(new PanelDto(panel.panelNumber(), panel.scene(), panel.caption(), panel.characters(),
+                        panel.dialogue(), last ? part.sourceText() : "", notes, place));
             }
         }
-        return new ComicStoryResponse("Demo Comic", panels);
+        return sheetRules.reconcile(new ComicStoryResponse("Demo Comic", panels), sheet);
+    }
+
+    /** The sheet characters named in the text, in order of mention; otherwise the previous panel's. */
+    private static List<String> castOf(String text, List<String> sheetNames, List<String> previous) {
+        List<String> named = sheetNames.stream()
+                .filter(name -> Pattern.compile("\\b" + Pattern.quote(name) + "\\b").matcher(text).find())
+                .sorted((a, b) -> text.indexOf(a) - text.indexOf(b))
+                .limit(MAX_CAST_PER_PANEL)
+                .toList();
+        return named.isEmpty() ? previous : named;
+    }
+
+    /** The first sheet place whose words appear in the text; otherwise the previous panel's place. */
+    private static String placeOf(String text, List<PlaceDto> places, String previous) {
+        return DemoCharacterFinder.placesIn(text).stream()
+                .map(PlaceDto::name)
+                .filter(name -> places.stream().anyMatch(p -> p.name().equals(name)))
+                .findFirst()
+                .orElse(previous);
     }
 
     /** Shares a part's sentences out between its panels, in order. */
@@ -135,16 +167,6 @@ public class DemoComicGenerator implements ComicGenerator {
             groups.add(String.join(" ", sentences.subList(from, to)));
         }
         return groups;
-    }
-
-    private static List<String> findCast(String text) {
-        List<String> names = NAME.matcher(text).results()
-                .map(java.util.regex.MatchResult::group)
-                .filter(n -> !NOT_NAMES.contains(n))
-                .distinct()
-                .limit(2)
-                .toList();
-        return names.isEmpty() ? List.of("Hero") : names;
     }
 
     private static PanelDto buildPanel(String text, int index, List<String> cast, ComicOptions options) {

@@ -64,8 +64,16 @@ timeout, upload and story length limits.
 
 1. `POST /api/comics/estimate` splits the story and predicts the run time, without calling the LLM.
    The UI shows this and waits for the user to confirm.
-2. `POST /api/comics/generate` sends the story to the LLM one part at a time, in order, and joins
-   the panels. Each part is told the character names found so far.
+2. `POST /api/comics/characters` runs the character pass: the story is read in chunks of
+   `comic.characters.chunk-chars`, one small call each, to find the main characters and places.
+   Each character gets a fixed design (person or animal, 1 to 2 of hat, hair and accessory, and
+   ears, tail and snout for animals) and each place a background preset. The UI shows this
+   character sheet for review and editing.
+3. `POST /api/comics/generate` sends the story to the LLM one part at a time, in order, and joins
+   the panels. Every part is given the sheet, and every figure is drawn from it by name, so a
+   character looks the same in every panel. Anyone a panel names who is not on the sheet gets a
+   plain design marked `added`. Without a `characterSheet`, generate runs the character pass
+   itself.
 
 Each part becomes one panel, and the story's own words for that part appear, exactly as written,
 under the panel (`sourceText`). The LLM never writes or rewrites that text. How much text a part
@@ -104,6 +112,7 @@ The frontend enforces the layout whatever the LLM chose: fixed figure slots, bub
 speakers, tails measured to end at the speaker's head, and speakers turned to face their listener.
 
 The estimate is `parts x (seconds-per-part + seconds-per-notes-call) + panels x seconds-per-panel`
+(+ `chunks x seconds-per-character-chunk` when no sheet is supplied)
 (all under `comic.llm`; the notes term only when notes are on, and retries are not counted). The
 defaults were measured with `qwen2.5-coder:7b` on one machine with the model already loaded, so
 retune them after changing model or hardware: the backend logs how long each part took.
@@ -119,6 +128,10 @@ curl -X POST localhost:8080/api/comics/generate \
 
 curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf" -F "supportLevel=2"
 ```
+
+`POST /api/comics/characters` takes the same text or file and returns `{ characters, places }`.
+Pass that sheet back, edited, as `characterSheet` (a JSON object, or a JSON string form field in a
+multipart request) to `/estimate` and `/generate`.
 
 `supportLevel` (default 1), `feelingLabels` and `notes` (both default `true`) are optional. When a
 toggle is off, that field is not requested from the LLM at all.

@@ -97,13 +97,38 @@
         <app-stick-figure class="loading-figure" pose="running" expression="happy" name="Artist" />
         <p>Inking your panels. This should take {{ estimatedTime() }}.</p>
       </div>
+    } @else if (finding()) {
+      <div class="loading">
+        <app-stick-figure class="loading-figure" pose="thinking" expression="happy" name="Reader" />
+        <p>Reading the story to find who is in it...</p>
+      </div>
     } @else if (estimate(); as plan) {
+      @if (!sheet()) {
+        <div class="confirm">
+          <p>
+            This will take <strong>{{ estimatedTime() }}</strong
+            >. The story splits into {{ plan.parts }} {{ plan.parts === 1 ? 'part' : 'parts' }}, for
+            up to {{ plan.panels }} {{ plan.panels === 1 ? 'panel' : 'panels' }}. First, the
+            characters are found so you can check how they look.
+          </p>
+          <div class="confirm-actions">
+            <button type="button" class="button button-secondary" (click)="cancelEstimate()">
+              Cancel
+            </button>
+            <button type="button" class="button" (click)="findCharacters()">
+              Find the characters
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  @if (sheet(); as reviewed) {
+    @if (!loading()) {
+      <app-character-sheet [sheet]="reviewed" (sheetChange)="sheet.set($event)" />
       <div class="confirm">
-        <p>
-          This will take <strong>{{ estimatedTime() }}</strong
-          >. The story splits into {{ plan.parts }} {{ plan.parts === 1 ? 'part' : 'parts' }}, for
-          up to {{ plan.panels }} {{ plan.panels === 1 ? 'panel' : 'panels' }}.
-        </p>
+        <p>When everyone looks right, draw the comic.</p>
         <div class="confirm-actions">
           <button type="button" class="button button-secondary" (click)="cancelEstimate()">
             Cancel
@@ -112,7 +137,7 @@
         </div>
       </div>
     }
-  </div>
+  }
 
   @if (story(); as comic) {
     <section class="comic" aria-label="Your comic">
@@ -131,6 +156,8 @@
           <app-comic-panel
             [panel]="panel"
             [colorOf]="colorFn"
+            [designs]="comic.characters"
+            [places]="comic.places"
             (captionChange)="setCaption(panelIndex, $event)"
             (dialogueChange)="setDialogue(panelIndex, $event.index, $event.text)"
             (characterChange)="updateCharacter(panelIndex, $event.index, $event.change)"

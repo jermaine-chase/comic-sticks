@@ -78,6 +78,35 @@ class ComicControllerTest {
     }
 
     @Test
+    void findsTheCharacterSheetAndDrawsFromAnEditedOne() throws Exception {
+        String story = "Mole met Ratty by the river. \\\"Hello!\\\" said Mole. Ratty waved.";
+        mvc.perform(post("/api/comics/characters")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.characters[0].name").value("Mole"))
+                .andExpect(jsonPath("$.characters[0].kind").value("animal"))
+                .andExpect(jsonPath("$.places[0].background").value("riverbank"));
+
+        String edited = """
+                {"characters":[{"name":"Mole","description":"Mole: shy.","kind":"animal","color":"#123456",
+                  "hat":"top_hat","hair":"none","accessory":"none","ears":"round","tail":"short","snout":"short"}],
+                 "places":[]}""";
+        mvc.perform(post("/api/comics/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\",\"characterSheet\":" + edited + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.characters[0].hat").value("top_hat"))
+                .andExpect(jsonPath("$.characters[0].color").value("#123456"))
+                .andExpect(jsonPath("$.panels[0].characters[0].name").value("Mole"));
+        var file = new MockMultipartFile("file", "story.txt", "text/plain",
+                story.replace("\\\"", "\"").getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/comics/generate").file(file).param("characterSheet", edited))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.characters[0].hat").value("top_hat"));
+    }
+
+    @Test
     void anUnknownSupportLevelIsRejected() throws Exception {
         mvc.perform(post("/api/comics/estimate")
                         .contentType(MediaType.APPLICATION_JSON)
