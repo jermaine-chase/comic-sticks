@@ -1,4 +1,12 @@
-import { Directive, ElementRef, EventEmitter, inject, Input, OnChanges, Output } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  EventEmitter,
+  inject,
+  Input,
+  OnChanges,
+  Output,
+} from '@angular/core';
 
 /**
  * Binds a contenteditable element to a string. The text is written with textContent, so markup

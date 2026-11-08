@@ -49,7 +49,8 @@ public class StoryTextExtractor {
         try (PDDocument document = Loader.loadPDF(bytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
             stripper.setParagraphEnd("\n\n"); // Keeps paragraphs apart for StorySegmenter.
-            String text = stripper.getText(document).strip();
+            // A PDF's spacing is layout, not a scene break, so runs of blank lines become one.
+            String text = stripper.getText(document).replace("\r\n", "\n").replaceAll("\\n{3,}", "\n\n").strip();
             if (text.isEmpty()) {
                 throw new ComicGenerationException(HttpStatus.UNPROCESSABLE_CONTENT,
                         "No text found in that PDF. It may be a scan, which would need OCR first.");

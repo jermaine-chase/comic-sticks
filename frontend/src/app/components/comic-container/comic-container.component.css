@@ -63,6 +63,28 @@ textarea:disabled {
   background: #f1eee6;
 }
 
+.settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--ink);
+}
+
+.settings legend {
+  padding: 0 0.3rem;
+  font: 400 1.15rem var(--font-display);
+  letter-spacing: 0.05em;
+}
+
+.setting-choice {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
 .composer-actions {
   display: flex;
   flex-wrap: wrap;

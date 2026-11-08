@@ -3,14 +3,12 @@ package com.comicsticks.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 
-import com.comicsticks.config.ComicProperties;
 import com.comicsticks.dto.CharacterDto;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.DialogueDto;
@@ -21,12 +19,11 @@ import com.comicsticks.dto.PanelDto;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.Scene;
 import com.comicsticks.exception.ComicGenerationException;
+import com.comicsticks.support.TestProperties;
 
 class ComicStoryNormalizerTest {
 
-    private final ComicStoryNormalizer normalizer = new ComicStoryNormalizer(new ComicProperties(
-            new ComicProperties.Llm("u", "k", "m", Duration.ofSeconds(1), 1, 1, 1),
-            new ComicProperties.Story(1000, 3, 3000, 150, 80)));
+    private final ComicStoryNormalizer normalizer = new ComicStoryNormalizer(TestProperties.properties(3));
 
     private static final CharacterDto MIA =
             new CharacterDto("Mia", Pose.WAVING, Expression.HAPPY, Facing.RIGHT);

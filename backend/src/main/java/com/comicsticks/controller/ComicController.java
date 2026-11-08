@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.comicsticks.config.ComicProperties;
 import com.comicsticks.dto.ComicEstimateResponse;
+import com.comicsticks.dto.ComicOptions;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.GenerateComicRequest;
 import com.comicsticks.exception.ComicGenerationException;
@@ -40,29 +41,31 @@ public class ComicController {
     /** Predicts the run time for story text sent as JSON, without calling the LLM. */
     @PostMapping(path = "/estimate", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ComicEstimateResponse estimateFromText(@Valid @RequestBody GenerateComicRequest request) {
-        return generator.estimate(validated(request.text()));
+        return generator.estimate(validated(request.text()), request.options());
     }
 
     /** Predicts the run time for an uploaded .txt or .pdf file, without calling the LLM. */
     @PostMapping(path = "/estimate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ComicEstimateResponse estimateFromFile(@RequestParam("file") MultipartFile file) {
-        return generator.estimate(validated(extractor.extract(file)));
+    public ComicEstimateResponse estimateFromFile(@RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) Integer supportLevel) {
+        return generator.estimate(validated(extractor.extract(file)), ComicOptions.of(supportLevel));
     }
 
     /** Generates a comic from raw story text sent as JSON. */
     @PostMapping(path = "/generate", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ComicStoryResponse generateFromText(@Valid @RequestBody GenerateComicRequest request) {
-        return generate(request.text());
+        return generate(request.text(), request.options());
     }
 
     /** Generates a comic from an uploaded .txt or .pdf file. */
     @PostMapping(path = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ComicStoryResponse generateFromFile(@RequestParam("file") MultipartFile file) {
-        return generate(extractor.extract(file));
+    public ComicStoryResponse generateFromFile(@RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) Integer supportLevel) {
+        return generate(extractor.extract(file), ComicOptions.of(supportLevel));
     }
 
-    private ComicStoryResponse generate(String rawText) {
-        return normalizer.normalize(generator.generate(validated(rawText)));
+    private ComicStoryResponse generate(String rawText, ComicOptions options) {
+        return normalizer.normalize(generator.generate(validated(rawText), options));
     }
 
     private String validated(String rawText) {

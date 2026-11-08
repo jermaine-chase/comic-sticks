@@ -41,8 +41,10 @@ class ComicControllerTest {
                 .andExpect(jsonPath("$.panels[0].panelNumber").value(1))
                 .andExpect(jsonPath("$.panels[0].characters[0].name").value("Mia"))
                 .andExpect(jsonPath("$.panels[0].characters[0].pose").value("standing"))
-                .andExpect(jsonPath("$.panels[0].dialogue[0].type").value("shout"))
-                .andExpect(jsonPath("$.panels[0].sourceText").value("Mia waved. \"Hello there!\" she said."));
+                .andExpect(jsonPath("$.panels[0].sourceText").value(""))
+                // A two-sentence ending gets two panels, with its text under the last.
+                .andExpect(jsonPath("$.panels[1].dialogue[0].type").value("shout"))
+                .andExpect(jsonPath("$.panels[1].sourceText").value("Mia waved. \"Hello there!\" she said."));
     }
 
     @Test
@@ -51,9 +53,37 @@ class ComicControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"text\":\"Mia waved. Leo ran.\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.panels").value(1))
+                .andExpect(jsonPath("$.panels").value(2))
                 .andExpect(jsonPath("$.parts").value(1))
                 .andExpect(jsonPath("$.estimatedSeconds").value(1));
+    }
+
+    @Test
+    void supportLevelChangesHowTextIsGrouped() throws Exception {
+        String story = "Mia ran.\\n\\nLeo hid.\\n\\nMia found him.\\n\\nThey laughed.";
+        mvc.perform(post("/api/comics/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\"}"))
+                .andExpect(jsonPath("$.parts").value(4));
+        mvc.perform(post("/api/comics/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\",\"supportLevel\":2}"))
+                .andExpect(jsonPath("$.parts").value(1));
+        var file = new MockMultipartFile("file", "story.txt", "text/plain",
+                story.replace("\\n", "\n").getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/comics/generate").file(file).param("supportLevel", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.panels.length()").value(2))
+                .andExpect(jsonPath("$.panels[1].sourceText").value(story.replace("\\n", "\n")));
+    }
+
+    @Test
+    void anUnknownSupportLevelIsRejected() throws Exception {
+        mvc.perform(post("/api/comics/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Mia ran.\",\"supportLevel\":7}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("The support level must be 1, 2 or 3."));
     }
 
     @Test

@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ComicEstimate, ComicStory } from '../models/comic.models';
+import { ComicEstimate, ComicOptions, ComicStory } from '../models/comic.models';
 
 const API_URL = '/api/comics';
 
@@ -16,21 +16,24 @@ export class ComicApiService {
   private readonly http = inject(HttpClient);
 
   /** Predicts the run time. This makes no LLM calls, so it returns straight away. */
-  estimate(story: StorySource): Observable<ComicEstimate> {
-    return this.http.post<ComicEstimate>(`${API_URL}/estimate`, requestBody(story));
+  estimate(story: StorySource, options: ComicOptions): Observable<ComicEstimate> {
+    return this.http.post<ComicEstimate>(`${API_URL}/estimate`, requestBody(story, options));
   }
 
-  generate(story: StorySource): Observable<ComicStory> {
-    return this.http.post<ComicStory>(`${API_URL}/generate`, requestBody(story));
+  generate(story: StorySource, options: ComicOptions): Observable<ComicStory> {
+    return this.http.post<ComicStory>(`${API_URL}/generate`, requestBody(story, options));
   }
 }
 
-function requestBody(story: StorySource): FormData | { text: string } {
+function requestBody(story: StorySource, options: ComicOptions): FormData | object {
   if (typeof story === 'string') {
-    return { text: story };
+    return { text: story, ...options };
   }
   const form = new FormData();
   form.append('file', story);
+  for (const [name, value] of Object.entries(options)) {
+    form.append(name, String(value));
+  }
   return form;
 }
 

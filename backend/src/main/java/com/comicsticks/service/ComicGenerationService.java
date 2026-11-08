@@ -21,6 +21,7 @@ import org.springframework.web.client.RestClientResponseException;
 import com.comicsticks.config.ComicProperties;
 import com.comicsticks.dto.CharacterDto;
 import com.comicsticks.dto.ComicEstimateResponse;
+import com.comicsticks.dto.ComicOptions;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.PanelDto;
 import com.comicsticks.exception.ComicGenerationException;
@@ -95,20 +96,20 @@ public class ComicGenerationService implements ComicGenerator {
     }
 
     @Override
-    public ComicEstimateResponse estimate(String storyText) {
-        List<Part> parts = segmenter.split(storyText);
+    public ComicEstimateResponse estimate(String storyText, ComicOptions options) {
+        List<Part> parts = segmenter.split(storyText, options.supportLevel());
         int panels = parts.stream().mapToInt(Part::panels).sum();
         double seconds = parts.size() * llm.secondsPerPart() + panels * llm.secondsPerPanel();
         return new ComicEstimateResponse(parts.size(), panels, (int) Math.ceil(seconds));
     }
 
     @Override
-    public ComicStoryResponse generate(String storyText) {
+    public ComicStoryResponse generate(String storyText, ComicOptions options) {
         if (llm.apiKey() == null || llm.apiKey().isBlank()) {
             throw new ComicGenerationException(HttpStatus.SERVICE_UNAVAILABLE,
                     "No LLM API key is configured. Set LLM_API_KEY on the server, or start it with the demo profile.");
         }
-        List<Part> parts = segmenter.split(storyText);
+        List<Part> parts = segmenter.split(storyText, options.supportLevel());
         List<PanelDto> panels = new ArrayList<>();
         Set<String> cast = new LinkedHashSet<>();
         String title = "";
@@ -150,7 +151,9 @@ public class ComicGenerationService implements ComicGenerator {
             message.append("Characters so far: ").append(String.join(", ", cast))
                     .append(". Use these exact names for the same people.\n");
         }
-        message.append("Use at most %d panels, spread evenly across this text. ".formatted(part.panels()));
+        message.append(part.panels() == 1
+                ? "Draw exactly 1 panel showing the most important moment of this text. "
+                : "Draw exactly %d panels, spread evenly across this text. ".formatted(part.panels()));
         message.append(number == total
                 ? "The last panel must show how the story ends, using the final sentences of this text."
                 : "The story continues after this part, so do not wrap it up.");

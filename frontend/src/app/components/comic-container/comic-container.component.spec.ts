@@ -91,7 +91,7 @@ describe('ComicContainerComponent', () => {
   it('posts the story and renders every panel', async () => {
     const request = await submitStory();
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ text: 'Mia found a map.' });
+    expect(request.request.body).toEqual({ text: 'Mia found a map.', supportLevel: 1 });
 
     request.flush(STORY);
     await fixture.whenStable();
@@ -111,6 +111,22 @@ describe('ComicContainerComponent', () => {
     expect(confirm).toContain('3 parts');
     expect(confirm).toContain('up to 8 panels');
     http.expectNone('/api/comics/generate');
+  });
+
+  it('sends the chosen support level and drops a stale estimate when it changes', async () => {
+    await reachConfirmation();
+    const levelTwo = root.querySelector<HTMLInputElement>(
+      'input[name="support-level"][value="2"]',
+    )!;
+
+    levelTwo.click();
+    await fixture.whenStable();
+    expect(root.querySelector('.confirm')).toBeNull();
+
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const request = http.expectOne('/api/comics/estimate');
+    expect(request.request.body).toEqual({ text: 'Mia found a map.', supportLevel: 2 });
+    request.flush(ESTIMATE);
   });
 
   it('cancelling goes back without generating', async () => {

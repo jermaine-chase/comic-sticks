@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.comicsticks.dto.CharacterDto;
 import com.comicsticks.dto.ComicEstimateResponse;
+import com.comicsticks.dto.ComicOptions;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.DialogueDto;
 import com.comicsticks.dto.DialogueType;
@@ -47,16 +48,16 @@ public class DemoComicGenerator implements ComicGenerator {
     }
 
     @Override
-    public ComicEstimateResponse estimate(String storyText) {
-        List<Part> parts = segmenter.split(storyText);
+    public ComicEstimateResponse estimate(String storyText, ComicOptions options) {
+        List<Part> parts = segmenter.split(storyText, options.supportLevel());
         return new ComicEstimateResponse(parts.size(), parts.stream().mapToInt(Part::panels).sum(), 1);
     }
 
     @Override
-    public ComicStoryResponse generate(String storyText) {
+    public ComicStoryResponse generate(String storyText, ComicOptions options) {
         List<String> cast = findCast(storyText);
         List<PanelDto> panels = new ArrayList<>();
-        for (Part part : segmenter.split(storyText)) {
+        for (Part part : segmenter.split(storyText, options.supportLevel())) {
             List<String> groups = sentenceGroups(part.text(), part.panels());
             for (int g = 0; g < groups.size(); g++) {
                 String source = g == groups.size() - 1 ? part.sourceText() : "";

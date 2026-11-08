@@ -12,7 +12,6 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +23,9 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.comicsticks.config.ComicProperties;
+import com.comicsticks.dto.ComicOptions;
 import com.comicsticks.dto.ComicStoryResponse;
+import com.comicsticks.support.TestProperties;
 import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.exception.ComicGenerationException;
@@ -46,10 +47,13 @@ class ComicGenerationServiceTest {
         service = serviceWithKey("test-key");
     }
 
+    private ComicStoryResponse generate(String text) {
+        return service.generate(text, ComicOptions.DEFAULTS);
+    }
+
     private ComicGenerationService serviceWithKey(String key) {
-        ComicProperties properties = new ComicProperties(
-                new ComicProperties.Llm("https://llm.test/v1", key, "test-model", Duration.ofSeconds(5), 1000, 2, 3),
-                new ComicProperties.Story(1000, 12, 300, 20, 80));
+        ComicProperties properties = TestProperties.properties(
+                TestProperties.llm("https://llm.test/v1", key), TestProperties.story(12));
         RestClient.Builder builder = RestClient.builder().baseUrl(properties.llm().baseUrl());
         server = MockRestServiceServer.bindTo(builder).build();
         return new ComicGenerationService(properties, new StorySegmenter(properties), builder.build());
@@ -73,7 +77,7 @@ class ComicGenerationServiceTest {
                 .andExpect(jsonPath("$.messages[1].content").value(startsWith("<story>\nOnce upon a time\n</story>")))
                 .andRespond(withSuccess(chatReply(STORY_JSON, "stop"), MediaType.APPLICATION_JSON));
 
-        ComicStoryResponse story = service.generate("Once upon a time");
+        ComicStoryResponse story = generate("Once upon a time");
 
         assertThat(story.title()).isEqualTo("T");
         assertThat(story.panels().getFirst().characters().getFirst().pose()).isEqualTo(Pose.WAVING);
@@ -98,7 +102,7 @@ class ComicGenerationServiceTest {
                 .andExpect(jsonPath("$.messages[1].content").value(containsString("how the story ends")))
                 .andRespond(withSuccess(chatReply(secondJson, "stop"), MediaType.APPLICATION_JSON));
 
-        ComicStoryResponse story = service.generate(partOne + "\n\n" + partTwo);
+        ComicStoryResponse story = generate(partOne + "\n\n" + partTwo);
 
         assertThat(story.title()).isEqualTo("T");
         assertThat(story.panels()).hasSize(2);
@@ -118,7 +122,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(chatReply(noPanels, "stop"), MediaType.APPLICATION_JSON));
 
-        ComicStoryResponse story = service.generate(partOne + "\n\n" + partTwo);
+        ComicStoryResponse story = generate(partOne + "\n\n" + partTwo);
 
         assertThat(story.panels()).extracting(p -> p.sourceText()).endsWith(partOne, partTwo);
         assertThat(story.panels().stream().map(p -> p.sourceText()).filter(s -> !s.isEmpty()))
@@ -132,7 +136,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(chatReply(json, "stop"), MediaType.APPLICATION_JSON));
 
-        assertThat(service.generate("Once upon a time").panels().getFirst().sourceText())
+        assertThat(generate("Once upon a time").panels().getFirst().sourceText())
                 .isEqualTo("Once upon a time");
     }
 
@@ -143,7 +147,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatThrownBy(() -> service.generate("Mia found the old map in the attic.\n\nLeo followed it to the cave."))
+        assertThatThrownBy(() -> generate("Mia found the old map in the attic.\n\nLeo followed it to the cave."))
                 .isInstanceOf(ComicGenerationException.class);
     }
 
@@ -155,7 +159,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(chatReply(three, "stop"), MediaType.APPLICATION_JSON));
 
-        ComicStoryResponse story = service.generate("Tiny story of one paragraph.");
+        ComicStoryResponse story = generate("Tiny story of one paragraph.");
 
         assertThat(story.panels()).hasSize(1);
         assertThat(story.panels().getFirst().dialogue().getFirst().text()).isEqualTo("The end");
@@ -163,7 +167,7 @@ class ComicGenerationServiceTest {
 
     @Test
     void estimateCountsPartsAndPanelsWithoutCallingTheLlm() {
-        var estimate = service.estimate("Mia found the old map in the attic.\n\nLeo followed it to the cave.");
+        var estimate = service.estimate("Mia found the old map in the attic.\n\nLeo followed it to the cave.", ComicOptions.DEFAULTS);
 
         assertThat(estimate.parts()).isEqualTo(2);
         assertThat(estimate.panels()).isEqualTo(2);
@@ -177,7 +181,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(chatReply(json, "stop"), MediaType.APPLICATION_JSON));
 
-        var character = service.generate("x").panels().getFirst().characters().getFirst();
+        var character = generate("x").panels().getFirst().characters().getFirst();
 
         assertThat(character.pose()).isEqualTo(Pose.STANDING);
         assertThat(character.expression()).isEqualTo(Expression.NEUTRAL);
@@ -187,7 +191,7 @@ class ComicGenerationServiceTest {
     void missingApiKeyIsAClearError() {
         ComicGenerationService noKey = serviceWithKey("");
 
-        assertThatThrownBy(() -> noKey.generate("x"))
+        assertThatThrownBy(() -> noKey.generate("x", ComicOptions.DEFAULTS))
                 .isInstanceOfSatisfying(ComicGenerationException.class,
                         e -> assertThat(e.status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
     }
@@ -197,7 +201,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(chatReply("{\"title\":", "length"), MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> service.generate("x"))
+        assertThatThrownBy(() -> generate("x"))
                 .isInstanceOf(ComicGenerationException.class)
                 .hasMessageContaining("too long");
     }
@@ -207,7 +211,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(chatReply("not json", "stop"), MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> service.generate("x"))
+        assertThatThrownBy(() -> generate("x"))
                 .isInstanceOfSatisfying(ComicGenerationException.class,
                         e -> assertThat(e.status()).isEqualTo(HttpStatus.BAD_GATEWAY));
     }
@@ -217,7 +221,7 @@ class ComicGenerationServiceTest {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withStatus(HttpStatus.UNAUTHORIZED).body("secret provider detail"));
 
-        assertThatThrownBy(() -> service.generate("x"))
+        assertThatThrownBy(() -> generate("x"))
                 .isInstanceOf(ComicGenerationException.class)
                 .hasMessageContaining("API key")
                 .hasMessageNotContaining("secret provider detail");

@@ -67,12 +67,23 @@ timeout, upload and story length limits.
 2. `POST /api/comics/generate` sends the story to the LLM one part at a time, in order, and joins
    the panels. Each part is told the character names found so far.
 
-Each paragraph is a part, with these adjustments (see `StorySegmenter`):
+Each part becomes one panel, and the story's own words for that part appear, exactly as written,
+under the panel (`sourceText`). The LLM never writes or rewrites that text. How much text a part
+holds depends on the support level (`supportLevel`, see `StorySegmenter`):
 
-- Paragraphs over `comic.story.max-part-chars` are cut at sentence boundaries.
-- Paragraphs under `comic.story.min-part-chars`, such as chapter headings, join a neighbour.
-- If there are more parts than `comic.story.max-panels`, the smallest neighbours merge.
-- The final paragraph stays separate and gets two panels when one is spare, to protect the ending.
+| Level       | One panel per                                                                  |
+| ----------- | ------------------------------------------------------------------------------ |
+| 1 (default) | paragraph. Paragraphs over `level1-max-part-chars` are cut at sentences.       |
+| 2           | 3 to 4 paragraphs (`level2-paragraphs-per-panel`).                             |
+| 3           | scene, split at `***`, `* * *`, extra blank lines and chapter headings, or 6 to 10 paragraphs when there are none. |
+
+- At level 1, only a heading, or a short line of dialogue and its short reply
+  (`short-line-chars`), joins a neighbour.
+- Groups never cross a scene break, and are spread evenly across each scene.
+- The final part gets a second panel when there is room and it has more than one sentence. Its
+  text then appears once, under the last of the two.
+- Text that needs more than `comic.story.max-panels` panels is refused with a message asking for
+  chapters or a shorter piece. Paragraphs are never merged to make it fit.
 
 The estimate is `parts x comic.llm.seconds-per-part + panels x comic.llm.seconds-per-panel`. The
 defaults were measured with `qwen2.5-coder:7b` on one machine with the model already loaded, so
@@ -85,10 +96,12 @@ retune them after changing model or hardware: the backend logs how long each par
 ```bash
 curl -X POST localhost:8080/api/comics/generate \
   -H "Content-Type: application/json" \
-  -d '{"text":"Mia found a map in the attic."}'
+  -d '{"text":"Mia found a map in the attic.","supportLevel":1}'
 
-curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf"
+curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf" -F "supportLevel=2"
 ```
+
+`supportLevel` is optional and defaults to 1.
 
 An estimate response:
 
@@ -105,11 +118,12 @@ A generate response:
     {
       "panelNumber": 1,
       "scene": "indoor",
-      "caption": "A rainy Saturday.",
+      "caption": "",
       "characters": [
         { "name": "Mia", "pose": "pointing", "expression": "surprised", "facing": "right" }
       ],
-      "dialogue": [{ "speaker": "Mia", "text": "Look at this!", "type": "shout" }]
+      "dialogue": [{ "speaker": "Mia", "text": "Look at this!", "type": "shout" }],
+      "sourceText": "Mia found a map in the attic. \"Look at this!\" she shouted."
     }
   ]
 }

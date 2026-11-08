@@ -62,6 +62,26 @@ export interface ComicStory {
   panels: Panel[];
 }
 
+/** 1: a panel per paragraph. 2: a panel per 3 to 4 paragraphs. 3: a panel per scene. */
+export type SupportLevel = 1 | 2 | 3;
+
+export const SUPPORT_LEVELS: readonly {
+  value: SupportLevel;
+  label: string;
+  description: string;
+}[] = [
+  { value: 1, label: 'Level 1', description: 'A picture for every paragraph.' },
+  { value: 2, label: 'Level 2', description: 'A picture for every 3 or 4 paragraphs.' },
+  { value: 3, label: 'Level 3', description: 'A picture for every scene.' },
+];
+
+/** Settings sent with each estimate and generate request. */
+export interface ComicOptions {
+  supportLevel: SupportLevel;
+}
+
+export const DEFAULT_OPTIONS: ComicOptions = { supportLevel: 1 };
+
 export interface ComicEstimate {
   parts: number;
   panels: number;

@@ -15,6 +15,25 @@
       (input)="onStoryInput($any($event.target).value)"
     ></textarea>
 
+    <fieldset class="settings">
+      <legend>Pictures</legend>
+      @for (level of supportLevels; track level.value) {
+        <label class="setting-choice">
+          <input
+            type="radio"
+            name="support-level"
+            [value]="level.value"
+            [checked]="supportLevel() === level.value"
+            [disabled]="loading()"
+            (change)="setSupportLevel(level.value)"
+          />
+          <span>
+            <strong>{{ level.label }}</strong> {{ level.description }}
+          </span>
+        </label>
+      }
+    </fieldset>
+
     <div class="composer-actions">
       <input
         #fileInput

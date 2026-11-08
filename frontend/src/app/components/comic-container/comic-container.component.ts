@@ -5,11 +5,15 @@ import { finalize } from 'rxjs';
 import {
   ComicCharacter,
   ComicEstimate,
+  ComicOptions,
   ComicStory,
+  DEFAULT_OPTIONS,
   Dialogue,
   EXPRESSIONS,
   Panel,
   POSES,
+  SUPPORT_LEVELS,
+  SupportLevel,
 } from '../../models/comic.models';
 import {
   ComicApiService,
@@ -56,6 +60,10 @@ export class ComicContainerComponent {
   protected readonly checking = signal(false);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  protected readonly supportLevels = SUPPORT_LEVELS;
+  protected readonly supportLevel = signal<SupportLevel>(DEFAULT_OPTIONS.supportLevel);
+  private readonly options = computed<ComicOptions>(() => ({ supportLevel: this.supportLevel() }));
 
   /** Set between checking the run time and the user's decision, and during the run itself. */
   protected readonly estimate = signal<ComicEstimate | null>(null);
@@ -108,6 +116,12 @@ export class ComicContainerComponent {
     this.storyText.set(text);
   }
 
+  /** A different level splits the text differently, so any estimate is out of date. */
+  protected setSupportLevel(level: SupportLevel): void {
+    this.estimate.set(null);
+    this.supportLevel.set(level);
+  }
+
   /** First step: shows the expected run time. Nothing is sent to the LLM until it is accepted. */
   protected checkRunTime(): void {
     if (!this.canCheck()) {
@@ -116,7 +130,7 @@ export class ComicContainerComponent {
     this.checking.set(true);
     this.error.set(null);
     this.api
-      .estimate(this.storySource())
+      .estimate(this.storySource(), this.options())
       .pipe(
         finalize(() => this.checking.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -135,7 +149,7 @@ export class ComicContainerComponent {
     this.loading.set(true);
     this.error.set(null);
     this.api
-      .generate(this.storySource())
+      .generate(this.storySource(), this.options())
       .pipe(
         finalize(() => {
           this.loading.set(false);
@@ -160,7 +174,10 @@ export class ComicContainerComponent {
   /** Places a bubble over its speaker's column, keeping it inside the panel. */
   protected bubbleLayout(panel: Panel, line: Dialogue) {
     const count = Math.max(panel.characters.length, 1);
-    const index = Math.max(panel.characters.findIndex((c) => c.name === line.speaker), 0);
+    const index = Math.max(
+      panel.characters.findIndex((c) => c.name === line.speaker),
+      0,
+    );
     const speakerCenter = ((index + 0.5) / count) * 100;
     const width = BUBBLE_WIDTHS[count] ?? BUBBLE_WIDTHS.at(-1)!;
     const left = clamp(speakerCenter - width / 2, 0, 100 - width);
