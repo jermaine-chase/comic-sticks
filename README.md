@@ -26,8 +26,10 @@ cd backend
 mvn spring-boot:run
 ```
 
-To try the app without any LLM, use the demo profile instead. It splits the text by sentence
-with simple rules, so its comics are much cruder than an LLM's:
+To try the app without any LLM, use the demo profile instead. It splits the text the same way, but
+fills every field with simple rules (quoted text becomes speech, feeling words become feelings, a
+short list of idioms becomes notes, capitalized names become characters), so its comics are much
+cruder than an LLM's:
 
 ```powershell
 mvn spring-boot:run "-Dspring-boot.run.profiles=demo"
@@ -58,7 +60,9 @@ Ollama server, so no environment variables are needed. Override these to use som
 
 The provider and model must support `response_format` with a strict `json_schema`.
 `backend/src/main/resources/application.properties` has OpenAI and Gemini examples, along with the
-timeout, upload and story length limits.
+timeout and upload limits, the run time estimate (`comic.llm.seconds-*`), the support levels
+(`comic.story.*`), the character pass (`comic.characters.*`) and the chapter bookends
+(`comic.bookends.*`).
 
 ## How a story becomes a comic
 
@@ -74,6 +78,8 @@ timeout, upload and story length limits.
    character looks the same in every panel. Anyone a panel names who is not on the sheet gets a
    plain design marked `added`. Without a `characterSheet`, generate runs the character pass
    itself.
+4. Generate then writes the chapter's bookends (see below): the opening "Who's who", the closing
+   "What happened" and, if asked for, the questions.
 
 Each part becomes one panel, and the story's own words for that part appear, exactly as written,
 under the panel (`sourceText`). The LLM never writes or rewrites that text. How much text a part
@@ -176,11 +182,18 @@ A generate response:
       ],
       "dialogue": [{ "speaker": "Mia", "text": "Look at this!", "type": "shout" }],
       "sourceText": "Mia found a map in the attic. \"Look at this!\" she shouted.",
-      "notes": []
+      "notes": [],
+      "place": "The attic"
     }
   ],
-  "characters": [],
-  "places": [],
+  "characters": [
+    {
+      "name": "Mia", "description": "Mia: a curious girl who loves maps.", "kind": "person",
+      "color": "#1b1b1f", "hat": "none", "hair": "ponytail", "accessory": "glasses",
+      "ears": "none", "tail": "none", "snout": "none", "added": false
+    }
+  ],
+  "places": [{ "name": "The attic", "description": "A dusty room at the top of the house.", "background": "room" }],
   "bookends": {
     "whosWho": { "characters": ["Mia"], "whereWeAre": "We are in the attic, on a rainy day." },
     "recap": [
@@ -201,10 +214,16 @@ cd backend;  mvn test
 cd frontend; npm test -- --watch=false
 ```
 
-## Adding a pose or expression
+## Adding a pose, expression or other value
 
-Add the value in three places: the Java enum (`Pose` or `Expression`), the list in
-`comic.models.ts`, and the drawing in `stick-figure.poses.ts`. The LLM schema is built from the
-Java enums, so it picks up the change on its own. A new expression should also get its feeling
-words in `FeelingExpressions`. Dialogue types follow the same rule (`DialogueType`,
-`DIALOGUE_TYPES`, and the bubble styles in `comic-panel.component.css`).
+Add the value in three places: the Java enum, the matching list in `comic.models.ts`, and its
+drawing. The LLM schemas are built from the Java enums, so they pick up the change on its own.
+
+| Values                                                                | Java enum                         | Drawn in                        |
+| --------------------------------------------------------------------- | --------------------------------- | ------------------------------- |
+| Poses, expressions                                                    | `Pose`, `Expression`              | `stick-figure.poses.ts`         |
+| Dialogue types                                                        | `DialogueType`                    | `comic-panel.component.css`     |
+| Hats, hair, accessories, ears, tails, snouts                          | `Hat`, `Hair`, `Accessory`, `Ears`, `AnimalTail`, `Snout` | `stick-figure.features.ts` |
+| Place backgrounds                                                     | `Background`                      | `panel-background.component.ts` |
+
+A new expression should also get its feeling words in `FeelingExpressions`.
