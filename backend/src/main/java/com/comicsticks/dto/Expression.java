@@ -1,0 +1,15 @@
+package com.comicsticks.dto;
+
+import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/** Every face the frontend can draw. Keep in sync with EXPRESSIONS in comic.models.ts. */
+public enum Expression {
+    @JsonEnumDefaultValue @JsonProperty("neutral") NEUTRAL,
+    @JsonProperty("happy") HAPPY,
+    @JsonProperty("sad") SAD,
+    @JsonProperty("angry") ANGRY,
+    @JsonProperty("surprised") SURPRISED,
+    @JsonProperty("scared") SCARED,
+    @JsonProperty("confused") CONFUSED
+}

@@ -1,0 +1,36 @@
+@import '@fontsource/bangers/400.css';
+@import '@fontsource/comic-neue/400.css';
+@import '@fontsource/comic-neue/700.css';
+
+:root {
+  --ink: #1b1b1f;
+  --paper: #fffdf6;
+  --page: #f3ead7;
+  --dots: #e6d9bd;
+  --accent: #e5352b;
+  --highlight: #ffd23f;
+  --muted: #5d5a52;
+  --font-display: 'Bangers', 'Impact', sans-serif;
+  --font-comic: 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-comic);
+  line-height: 1.4;
+  background-color: var(--page);
+  background-image: radial-gradient(var(--dots) 1.5px, transparent 1.6px);
+  background-size: 14px 14px;
+}

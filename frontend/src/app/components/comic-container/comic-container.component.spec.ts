@@ -1,0 +1,203 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComicEstimate, ComicStory } from '../../models/comic.models';
+import { ComicContainerComponent } from './comic-container.component';
+
+const STORY: ComicStory = {
+  title: 'The Map',
+  panels: [
+    {
+      panelNumber: 1,
+      scene: 'indoor',
+      caption: 'In the attic.',
+      characters: [
+        { name: 'Mia', pose: 'pointing', expression: 'surprised', facing: 'right' },
+        { name: 'Leo', pose: 'standing', expression: 'neutral', facing: 'left' },
+      ],
+      dialogue: [{ speaker: 'Mia', text: '<b>Look!</b>', type: 'shout' }],
+    },
+    {
+      panelNumber: 2,
+      scene: 'plain',
+      caption: '',
+      characters: [{ name: 'Leo', pose: 'thinking', expression: 'confused', facing: 'right' }],
+      dialogue: [{ speaker: 'Leo', text: 'Hmm.', type: 'thought' }],
+    },
+  ],
+};
+
+const ESTIMATE: ComicEstimate = { parts: 3, panels: 8, estimatedSeconds: 41 };
+
+describe('ComicContainerComponent', () => {
+  let fixture: ComponentFixture<ComicContainerComponent>;
+  let http: HttpTestingController;
+  let root: HTMLElement;
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      imports: [ComicContainerComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    fixture = TestBed.createComponent(ComicContainerComponent);
+    http = TestBed.inject(HttpTestingController);
+    root = fixture.nativeElement;
+    await fixture.whenStable();
+  });
+
+  afterEach(() => http.verify());
+
+  async function typeStory(text: string) {
+    const textarea = root.querySelector('textarea')!;
+    textarea.value = text;
+    textarea.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+  }
+
+  /** Submits the form and answers the estimate request, stopping at the confirmation. */
+  async function reachConfirmation() {
+    await typeStory('Mia found a map.');
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    http.expectOne('/api/comics/estimate').flush(ESTIMATE);
+    await fixture.whenStable();
+  }
+
+  function clickButton(label: string) {
+    const button = Array.from(root.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent?.trim() === label,
+    );
+    button!.click();
+  }
+
+  async function submitStory() {
+    await reachConfirmation();
+    clickButton('Start drawing');
+    return http.expectOne('/api/comics/generate');
+  }
+
+  async function renderStory() {
+    (await submitStory()).flush(STORY);
+    await fixture.whenStable();
+  }
+
+  async function editText(element: HTMLElement, text: string) {
+    element.textContent = text;
+    element.dispatchEvent(new Event('blur'));
+    await fixture.whenStable();
+  }
+
+  it('posts the story and renders every panel', async () => {
+    const request = await submitStory();
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ text: 'Mia found a map.' });
+
+    request.flush(STORY);
+    await fixture.whenStable();
+
+    expect(root.querySelector('.comic-grid')).toBeTruthy();
+    expect(root.querySelectorAll('.panel').length).toBe(2);
+    expect(root.querySelectorAll('app-stick-figure').length).toBe(3);
+    expect(root.querySelector('.bubble-shout')).toBeTruthy();
+    expect(root.querySelector('.bubble-thought')).toBeTruthy();
+  });
+
+  it('shows the estimate and calls nothing further until confirmed', async () => {
+    await reachConfirmation();
+
+    const confirm = root.querySelector('.confirm')!.textContent!.replace(/\s+/g, ' ');
+    expect(confirm).toContain('about 40 seconds');
+    expect(confirm).toContain('3 parts');
+    expect(confirm).toContain('up to 8 panels');
+    http.expectNone('/api/comics/generate');
+  });
+
+  it('cancelling goes back without generating', async () => {
+    await reachConfirmation();
+
+    clickButton('Cancel');
+    await fixture.whenStable();
+
+    expect(root.querySelector('.confirm')).toBeNull();
+    http.expectNone('/api/comics/generate');
+  });
+
+  it('discards the estimate when the story changes', async () => {
+    await reachConfirmation();
+
+    await typeStory('A different story.');
+
+    expect(root.querySelector('.confirm')).toBeNull();
+  });
+
+  it('shows the estimate while drawing', async () => {
+    const request = await submitStory();
+    await fixture.whenStable();
+
+    expect(root.querySelector('.loading')?.textContent).toContain('about 40 seconds');
+
+    request.flush(STORY);
+    await fixture.whenStable();
+    expect(root.querySelector('.loading')).toBeNull();
+    expect(root.querySelector('.confirm')).toBeNull();
+  });
+
+  it('shows story markup as literal text', async () => {
+    await renderStory();
+
+    const bubble = root.querySelector<HTMLElement>('.bubble')!;
+    expect(bubble.textContent).toBe('<b>Look!</b>');
+    expect(bubble.querySelector('b')).toBeNull();
+  });
+
+  it('marks text as editable and keeps edits', async () => {
+    await renderStory();
+    const bubble = root.querySelector<HTMLElement>('.bubble')!;
+    expect(bubble.getAttribute('contenteditable')).toBe('true');
+
+    await editText(bubble, 'Over here!');
+
+    expect(root.querySelector('.bubble')!.textContent).toBe('Over here!');
+  });
+
+  it('renames a character in every panel', async () => {
+    await renderStory();
+    const names = () =>
+      Array.from(root.querySelectorAll('.actor-name')).map((name) => name.textContent);
+
+    await editText(root.querySelectorAll<HTMLElement>('.actor-name')[1], 'Theo');
+
+    expect(names()).toEqual(['Mia', 'Theo', 'Theo']);
+  });
+
+  it('rejects renaming a character to a name already taken', async () => {
+    await renderStory();
+
+    await editText(root.querySelectorAll<HTMLElement>('.actor-name')[1], 'Mia');
+
+    expect(root.querySelectorAll('.actor-name')[1].textContent).toBe('Leo');
+  });
+
+  it('changes a pose from the picker', async () => {
+    await renderStory();
+    const select = root.querySelector<HTMLSelectElement>('.actor-controls select')!;
+    expect(select.value).toBe('pointing');
+
+    select.value = 'running';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    expect(root.querySelector('svg')!.getAttribute('aria-label')).toBe(
+      'Mia, running, looking surprised',
+    );
+  });
+
+  it('shows the server error detail', async () => {
+    (await submitStory()).flush(
+      { detail: 'No LLM API key is configured.' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    await fixture.whenStable();
+
+    expect(root.querySelector('.alert')?.textContent).toContain('No LLM API key');
+  });
+});

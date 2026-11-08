@@ -1,0 +1,175 @@
+<header class="masthead">
+  <h1>Comic Sticks</h1>
+  <p>Paste a story, get a stick figure comic.</p>
+</header>
+
+<main class="page">
+  <form class="composer" (submit)="$event.preventDefault(); checkRunTime()">
+    <label class="composer-label" for="story-text">Your story</label>
+    <textarea
+      id="story-text"
+      rows="6"
+      placeholder="Mia found a map in the attic. &quot;Look at this!&quot; she shouted to Leo..."
+      [value]="storyText()"
+      [disabled]="file() !== null || loading()"
+      (input)="onStoryInput($any($event.target).value)"
+    ></textarea>
+
+    <div class="composer-actions">
+      <input
+        #fileInput
+        id="story-file"
+        class="visually-hidden"
+        type="file"
+        accept=".txt,.pdf,text/plain,application/pdf"
+        (change)="onFileSelected(fileInput)"
+      />
+      @if (file(); as attached) {
+        <span class="file-chip">
+          Using {{ attached.name }}
+          <button
+            type="button"
+            class="file-remove"
+            aria-label="Remove attached file"
+            (click)="removeFile(fileInput)"
+          >
+            &times;
+          </button>
+        </span>
+      } @else {
+        <label class="button button-secondary" for="story-file">Attach .txt or .pdf</label>
+      }
+      <button class="button" type="submit" [disabled]="!canCheck()">
+        {{ loading() ? 'Drawing...' : 'Make my comic' }}
+      </button>
+    </div>
+  </form>
+
+  <div aria-live="polite">
+    @if (error(); as message) {
+      <p class="alert" role="alert">{{ message }}</p>
+    }
+    @if (loading()) {
+      <div class="loading">
+        <app-stick-figure class="loading-figure" pose="running" expression="happy" name="Artist" />
+        <p>Inking your panels. This should take {{ estimatedTime() }}.</p>
+      </div>
+    } @else if (estimate(); as plan) {
+      <div class="confirm">
+        <p>
+          This will take <strong>{{ estimatedTime() }}</strong>. The story splits into
+          {{ plan.parts }} {{ plan.parts === 1 ? 'part' : 'parts' }}, for up to
+          {{ plan.panels }} {{ plan.panels === 1 ? 'panel' : 'panels' }}.
+        </p>
+        <div class="confirm-actions">
+          <button type="button" class="button button-secondary" (click)="cancelEstimate()">
+            Cancel
+          </button>
+          <button type="button" class="button" (click)="generate()">Start drawing</button>
+        </div>
+      </div>
+    }
+  </div>
+
+  @if (story(); as comic) {
+    <section class="comic" aria-label="Your comic">
+      <h2
+        class="comic-title"
+        contenteditable="true"
+        spellcheck="false"
+        aria-label="Comic title"
+        [appEditable]="comic.title"
+        (edited)="setTitle($event)"
+      ></h2>
+      <p class="hint">Click any text to edit it. Hover over a figure to change its pose or face.</p>
+
+      <div class="comic-grid">
+        @for (panel of comic.panels; track $index; let panelIndex = $index) {
+          <article
+            class="panel"
+            [class]="'scene-' + panel.scene"
+            [attr.aria-label]="'Panel ' + panel.panelNumber"
+          >
+            <p
+              class="caption"
+              contenteditable="true"
+              aria-label="Panel caption"
+              [appEditable]="panel.caption"
+              (edited)="setCaption(panelIndex, $event)"
+            ></p>
+
+            <div class="bubbles">
+              @for (line of panel.dialogue; track $index; let lineIndex = $index) {
+                @let layout = bubbleLayout(panel, line);
+                <p
+                  class="bubble"
+                  [class]="'bubble-' + line.type"
+                  contenteditable="true"
+                  [attr.aria-label]="line.speaker + ' says'"
+                  [style.width.%]="layout.width"
+                  [style.margin-left.%]="layout.left"
+                  [style.--tail-x]="layout.tail"
+                  [appEditable]="line.text"
+                  (edited)="setDialogue(panelIndex, lineIndex, $event)"
+                ></p>
+              }
+            </div>
+
+            <div class="stage">
+              @for (character of panel.characters; track $index; let characterIndex = $index) {
+                <div class="actor">
+                  <app-stick-figure
+                    class="figure"
+                    [pose]="character.pose"
+                    [expression]="character.expression"
+                    [facing]="character.facing"
+                    [color]="colorOf(character.name)"
+                    [name]="character.name"
+                  />
+                  <span
+                    class="actor-name"
+                    contenteditable="true"
+                    spellcheck="false"
+                    aria-label="Character name"
+                    [appEditable]="character.name"
+                    (edited)="renameCharacter(character.name, $event)"
+                  ></span>
+                  <div class="actor-controls">
+                    <select
+                      [attr.aria-label]="character.name + ' pose'"
+                      (change)="
+                        updateCharacter(panelIndex, characterIndex, {
+                          pose: $any($event.target).value,
+                        })
+                      "
+                    >
+                      @for (pose of poses; track pose) {
+                        <option [value]="pose" [selected]="pose === character.pose">
+                          {{ pose }}
+                        </option>
+                      }
+                    </select>
+                    <select
+                      [attr.aria-label]="character.name + ' expression'"
+                      (change)="
+                        updateCharacter(panelIndex, characterIndex, {
+                          expression: $any($event.target).value,
+                        })
+                      "
+                    >
+                      @for (expression of expressions; track expression) {
+                        <option [value]="expression" [selected]="expression === character.expression">
+                          {{ expression }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                </div>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    </section>
+  }
+</main>
