@@ -1,6 +1,15 @@
 import { Component, Input } from '@angular/core';
 import { Expression, Facing, Pose } from '../../models/comic.models';
-import { FACES, OPEN_MOUTH, SKELETONS, Skeleton } from './stick-figure.poses';
+import {
+  EYE_PATHS,
+  Face,
+  FACES,
+  OPEN_MOUTH,
+  SKELETONS,
+  Skeleton,
+  SWEAT_PATH,
+  TEAR_PATH,
+} from './stick-figure.poses';
 
 const CANVAS_WIDTH = 120;
 const FACE_INK = '#1b1b1f';
@@ -17,6 +26,11 @@ const FACE_INK = '#1b1b1f';
       width: 100%;
       height: 100%;
       overflow: visible;
+    }
+    .symbol {
+      font:
+        700 30px/1 'Atkinson Hyperlegible',
+        sans-serif;
     }
   `,
   template: `
@@ -38,26 +52,53 @@ const FACE_INK = '#1b1b1f';
         <path [attr.d]="bodyPath" />
         <g [attr.transform]="headTransform">
           <circle r="20" fill="#fffdf6" />
-          <g [attr.stroke]="faceInk" stroke-width="2.5">
-            @if (face.wideEyes) {
-              <circle cx="-6" cy="-4" r="4.5" fill="#fff" />
-              <circle cx="9" cy="-4" r="4.5" fill="#fff" />
-              <circle cx="-5" cy="-4" r="1.5" [attr.fill]="faceInk" stroke="none" />
-              <circle cx="10" cy="-4" r="1.5" [attr.fill]="faceInk" stroke="none" />
-            } @else {
-              <circle cx="-6" cy="-4" r="2.4" [attr.fill]="faceInk" stroke="none" />
-              <circle cx="9" cy="-4" r="2.4" [attr.fill]="faceInk" stroke="none" />
+          <g class="face" [attr.stroke]="faceInk" stroke-width="2.5">
+            @if (face.blush) {
+              <ellipse cx="-11" cy="5" rx="4.5" ry="2.5" fill="#f4a3b4" stroke="none" />
+              <ellipse cx="14" cy="5" rx="4.5" ry="2.5" fill="#f4a3b4" stroke="none" />
+            }
+            @switch (face.eyes ?? 'dot') {
+              @case ('wide') {
+                <circle cx="-6" cy="-4" r="5" fill="#fff" />
+                <circle cx="9" cy="-4" r="5" fill="#fff" />
+                <circle cx="-5" cy="-4" r="1.8" [attr.fill]="faceInk" stroke="none" />
+                <circle cx="10" cy="-4" r="1.8" [attr.fill]="faceInk" stroke="none" />
+              }
+              @case ('dot') {
+                <circle cx="-6" cy="-4" r="2.6" [attr.fill]="faceInk" stroke="none" />
+                <circle cx="9" cy="-4" r="2.6" [attr.fill]="faceInk" stroke="none" />
+              }
+              @default {
+                <path class="eyes" [attr.d]="eyePath" />
+              }
             }
             @if (face.brows) {
-              <path [attr.d]="face.brows" />
+              <path class="brows" [attr.d]="face.brows" stroke-width="3" />
             }
-            <path [attr.d]="mouth" [attr.fill]="mouthFill" />
-            @if (face.extra) {
-              <path [attr.d]="face.extra" fill="#6db9ee" stroke="none" />
+            <path class="mouth" [attr.d]="mouth" [attr.fill]="mouthFill" />
+            @if (face.tear) {
+              <path class="tear" [attr.d]="tearPath" fill="#6db9ee" stroke="none" />
+            }
+            @if (face.sweat) {
+              <path class="sweat" [attr.d]="sweatPath" fill="#6db9ee" stroke="none" />
+            }
+            @if (face.marks) {
+              <path class="marks" [attr.d]="face.marks" stroke-width="2.5" />
             }
           </g>
         </g>
       </g>
+      @if (face.symbol) {
+        <text
+          class="symbol"
+          text-anchor="middle"
+          [attr.x]="symbolX"
+          [attr.y]="symbolY"
+          [attr.fill]="faceInk"
+        >
+          {{ face.symbol }}
+        </text>
+      }
     </svg>
   `,
 })
@@ -69,13 +110,20 @@ export class StickFigureComponent {
   @Input() name = 'Stick figure';
 
   protected readonly faceInk = FACE_INK;
+  protected readonly tearPath = TEAR_PATH;
+  protected readonly sweatPath = SWEAT_PATH;
 
   protected get skeleton(): Skeleton {
     return SKELETONS[this.pose] ?? SKELETONS.standing;
   }
 
-  protected get face() {
+  protected get face(): Face {
     return FACES[this.expression] ?? FACES.neutral;
+  }
+
+  protected get eyePath(): string {
+    const eyes = this.face.eyes;
+    return eyes === 'happy' || eyes === 'closed' || eyes === 'half' ? EYE_PATHS[eyes] : '';
   }
 
   protected get label(): string {
@@ -89,6 +137,16 @@ export class StickFigureComponent {
   protected get headTransform(): string {
     const [x, y] = this.skeleton.head;
     return `translate(${x},${y})`;
+  }
+
+  /** Above the head, on the side the figure faces, and never mirrored so it stays readable. */
+  protected get symbolX(): number {
+    const x = this.skeleton.head[0] + 22;
+    return this.facing === 'left' ? CANVAS_WIDTH - x : x;
+  }
+
+  protected get symbolY(): number {
+    return this.skeleton.head[1] - 18;
   }
 
   protected get bodyPath(): string {
@@ -109,6 +167,6 @@ export class StickFigureComponent {
   }
 
   protected get mouthFill(): string {
-    return this.skeleton.openMouth ? FACE_INK : 'none';
+    return this.skeleton.openMouth || this.face.filledMouth ? FACE_INK : 'none';
   }
 }

@@ -27,18 +27,29 @@ export const EXPRESSIONS = [
   'surprised',
   'scared',
   'confused',
+  'worried',
+  'excited',
+  'proud',
+  'embarrassed',
+  'determined',
+  'tired',
 ] as const;
 export type Expression = (typeof EXPRESSIONS)[number];
 
 export type Facing = 'left' | 'right';
 export type Scene = 'plain' | 'indoor' | 'outdoor' | 'night';
-export type DialogueType = 'speech' | 'thought' | 'shout';
+
+/** Speech, shout and whisper are words spoken in the text. A thought is drawn as a cloud. */
+export const DIALOGUE_TYPES = ['speech', 'thought', 'shout', 'whisper'] as const;
+export type DialogueType = (typeof DIALOGUE_TYPES)[number];
 
 export interface ComicCharacter {
   name: string;
   pose: Pose;
   expression: Expression;
   facing: Facing;
+  /** One plain word, such as "scared", shown as a tag near the figure. Empty when there is none. */
+  feeling: string;
 }
 
 export interface Dialogue {
@@ -47,14 +58,22 @@ export interface Dialogue {
   type: DialogueType;
 }
 
+/** A "what it means" note. `phrase` appears in the panel's source text. */
+export interface Note {
+  phrase: string;
+  meaning: string;
+}
+
 export interface Panel {
   panelNumber: number;
   scene: Scene;
+  /** A scene-change box such as "Later that night...". Empty when time and place are unchanged. */
   caption: string;
   characters: ComicCharacter[];
   dialogue: Dialogue[];
   /** The book's own words for this panel, exactly as written. Empty when a later panel has them. */
   sourceText: string;
+  notes: Note[];
 }
 
 export interface ComicStory {
@@ -78,9 +97,13 @@ export const SUPPORT_LEVELS: readonly {
 /** Settings sent with each estimate and generate request. */
 export interface ComicOptions {
   supportLevel: SupportLevel;
+  /** One-word feeling tags near each figure. When off, the LLM is not asked for them. */
+  feelingLabels: boolean;
+  /** "What it means" notes for idioms and other tricky phrases. When off, they are not generated. */
+  notes: boolean;
 }
 
-export const DEFAULT_OPTIONS: ComicOptions = { supportLevel: 1 };
+export const DEFAULT_OPTIONS: ComicOptions = { supportLevel: 1, feelingLabels: true, notes: true };
 
 export interface ComicEstimate {
   parts: number;

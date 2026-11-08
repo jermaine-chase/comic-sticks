@@ -85,7 +85,26 @@ holds depends on the support level (`supportLevel`, see `StorySegmenter`):
 - Text that needs more than `comic.story.max-panels` panels is refused with a message asking for
   chapters or a shorter piece. Paragraphs are never merged to make it fit.
 
-The estimate is `parts x comic.llm.seconds-per-part + panels x comic.llm.seconds-per-panel`. The
+### What goes in a panel
+
+Each part makes small, strict-schema LLM calls rather than one big one, which suits small local
+models:
+
+1. **Panels.** Characters with pose, face, facing and (if on) a one-word `feeling`; bubbles; and a
+   `caption` only when time passes or the place changes. Bubbles of type `speech`, `shout` and
+   `whisper` must be words spoken in the text: `PanelValidator` checks each one as a substring of
+   the passage's quotations, ignoring curly vs. straight quotes, case and whitespace. If one fails,
+   the part is retried once with the problem explained, then any bubble still failing is dropped.
+   `thought` bubbles (what a character thinks, wants or plans) are drawn as clouds and not checked.
+2. **Notes** (if on). "What it means" notes for idioms, metaphors, sarcasm and old words. A note is
+   kept only if its `phrase` appears in the panel's `sourceText`.
+
+A known feeling word sets the face (`FeelingExpressions`), so the label and face never disagree.
+The frontend enforces the layout whatever the LLM chose: fixed figure slots, bubbles above their
+speakers, tails measured to end at the speaker's head, and speakers turned to face their listener.
+
+The estimate is `parts x (seconds-per-part + seconds-per-notes-call) + panels x seconds-per-panel`
+(all under `comic.llm`; the notes term only when notes are on, and retries are not counted). The
 defaults were measured with `qwen2.5-coder:7b` on one machine with the model already loaded, so
 retune them after changing model or hardware: the backend logs how long each part took.
 
@@ -101,7 +120,8 @@ curl -X POST localhost:8080/api/comics/generate \
 curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf" -F "supportLevel=2"
 ```
 
-`supportLevel` is optional and defaults to 1.
+`supportLevel` (default 1), `feelingLabels` and `notes` (both default `true`) are optional. When a
+toggle is off, that field is not requested from the LLM at all.
 
 An estimate response:
 
@@ -120,10 +140,11 @@ A generate response:
       "scene": "indoor",
       "caption": "",
       "characters": [
-        { "name": "Mia", "pose": "pointing", "expression": "surprised", "facing": "right" }
+        { "name": "Mia", "pose": "pointing", "expression": "surprised", "facing": "right", "feeling": "surprised" }
       ],
       "dialogue": [{ "speaker": "Mia", "text": "Look at this!", "type": "shout" }],
-      "sourceText": "Mia found a map in the attic. \"Look at this!\" she shouted."
+      "sourceText": "Mia found a map in the attic. \"Look at this!\" she shouted.",
+      "notes": []
     }
   ]
 }
@@ -142,4 +163,6 @@ cd frontend; npm test -- --watch=false
 
 Add the value in three places: the Java enum (`Pose` or `Expression`), the list in
 `comic.models.ts`, and the drawing in `stick-figure.poses.ts`. The LLM schema is built from the
-Java enums, so it picks up the change on its own.
+Java enums, so it picks up the change on its own. A new expression should also get its feeling
+words in `FeelingExpressions`. Dialogue types follow the same rule (`DialogueType`,
+`DIALOGUE_TYPES`, and the bubble styles in `comic-panel.component.css`).

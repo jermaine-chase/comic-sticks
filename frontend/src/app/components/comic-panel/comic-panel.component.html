@@ -1,0 +1,136 @@
+@let p = panel();
+<figure class="panel-block">
+  <article
+    #frame
+    class="panel"
+    [class]="'panel scene-' + p.scene"
+    [attr.aria-label]="'Panel ' + p.panelNumber"
+  >
+    @if (p.caption || editable()) {
+      <p
+        class="caption"
+        [attr.contenteditable]="editable() ? 'true' : null"
+        aria-label="Scene change"
+        [appEditable]="p.caption"
+        (edited)="captionChange.emit($event)"
+      ></p>
+    }
+
+    <div class="bubbles">
+      @for (bubble of bubbles(); track $index; let lineIndex = $index) {
+        <p
+          class="bubble"
+          [class]="'bubble bubble-' + bubble.line.type"
+          [attr.contenteditable]="editable() ? 'true' : null"
+          [attr.aria-label]="bubbleLabel(bubble.line.speaker, bubble.line.type)"
+          [attr.data-type-label]="bubble.line.type === 'whisper' ? 'whisper' : null"
+          [style.width.%]="bubble.layout.width"
+          [style.margin-left.%]="bubble.layout.left"
+          [appEditable]="bubble.line.text"
+          (edited)="dialogueChange.emit({ index: lineIndex, text: $event })"
+        ></p>
+      }
+    </div>
+
+    <svg class="tails" aria-hidden="true">
+      @for (path of connectors(); track $index) {
+        <path class="connector" [attr.d]="path" />
+      }
+      @for (tail of tails(); track $index) {
+        @if (tail.path) {
+          <path class="tail" [class]="'tail tail-' + tail.type" [attr.d]="tail.path" />
+        }
+        @for (circle of tail.circles ?? []; track $index) {
+          <circle
+            class="thought-dot"
+            [attr.cx]="circle.cx"
+            [attr.cy]="circle.cy"
+            [attr.r]="circle.r"
+          />
+        }
+      }
+    </svg>
+
+    <div class="stage">
+      @for (character of p.characters; track $index; let characterIndex = $index) {
+        <div class="actor" [style.left.%]="slots()[characterIndex]">
+          <app-stick-figure
+            class="figure"
+            [pose]="character.pose"
+            [expression]="character.expression"
+            [facing]="facing()[characterIndex]"
+            [color]="colorOf()(character.name)"
+            [name]="character.name"
+          />
+          <span
+            class="actor-name"
+            [attr.contenteditable]="editable() ? 'true' : null"
+            spellcheck="false"
+            aria-label="Character name"
+            [appEditable]="character.name"
+            (edited)="rename.emit({ from: character.name, to: $event })"
+          ></span>
+          @if (character.feeling) {
+            <span
+              class="feeling"
+              [attr.aria-label]="character.name + ' feels ' + character.feeling"
+            >
+              {{ character.feeling }}
+            </span>
+          }
+          @if (editable()) {
+            <div class="actor-controls">
+              <select
+                [attr.aria-label]="character.name + ' pose'"
+                (change)="
+                  characterChange.emit({
+                    index: characterIndex,
+                    change: { pose: $any($event.target).value },
+                  })
+                "
+              >
+                @for (pose of poses; track pose) {
+                  <option [value]="pose" [selected]="pose === character.pose">{{ pose }}</option>
+                }
+              </select>
+              <select
+                [attr.aria-label]="character.name + ' expression'"
+                (change)="
+                  characterChange.emit({
+                    index: characterIndex,
+                    change: { expression: $any($event.target).value },
+                  })
+                "
+              >
+                @for (expression of expressions; track expression) {
+                  <option [value]="expression" [selected]="expression === character.expression">
+                    {{ expression }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </article>
+
+  @if (p.sourceText) {
+    <figcaption class="text-block">
+      <p class="source-text">{{ p.sourceText }}</p>
+      @if (p.notes.length) {
+        <aside class="notes" aria-label="What it means">
+          <h3 class="notes-title">What it means</h3>
+          <dl>
+            @for (note of p.notes; track $index) {
+              <div class="note">
+                <dt>&ldquo;{{ note.phrase }}&rdquo;</dt>
+                <dd>{{ note.meaning }}</dd>
+              </div>
+            }
+          </dl>
+        </aside>
+      }
+    </figcaption>
+  }
+</figure>

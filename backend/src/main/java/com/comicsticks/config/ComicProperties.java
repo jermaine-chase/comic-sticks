@@ -14,7 +14,8 @@ public record ComicProperties(Llm llm, Story story) {
             Duration timeout,
             int maxOutputTokens,
             double secondsPerPart,
-            double secondsPerPanel) {
+            double secondsPerPanel,
+            double secondsPerNotesCall) {
     }
 
     /**

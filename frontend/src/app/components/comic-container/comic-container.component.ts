@@ -8,10 +8,7 @@ import {
   ComicOptions,
   ComicStory,
   DEFAULT_OPTIONS,
-  Dialogue,
-  EXPRESSIONS,
   Panel,
-  POSES,
   SUPPORT_LEVELS,
   SupportLevel,
 } from '../../models/comic.models';
@@ -22,14 +19,10 @@ import {
   StorySource,
 } from '../../services/comic-api.service';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
+import { ComicPanelComponent } from '../comic-panel/comic-panel.component';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
 
 const CAST_COLORS = ['#1b1b1f', '#c8321f', '#1f5fbf', '#1c8a4a', '#8a3fb8', '#b85f00'];
-
-/** Bubble width as a share of the panel, by the number of figures in it. */
-const BUBBLE_WIDTHS = [80, 80, 66, 58, 54];
-
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 function describeDuration(seconds: number): string {
   if (seconds < 10) {
@@ -43,16 +36,13 @@ function describeDuration(seconds: number): string {
 
 @Component({
   selector: 'app-comic-container',
-  imports: [StickFigureComponent, EditableTextDirective],
+  imports: [StickFigureComponent, EditableTextDirective, ComicPanelComponent],
   templateUrl: './comic-container.component.html',
   styleUrl: './comic-container.component.css',
 })
 export class ComicContainerComponent {
   private readonly api = inject(ComicApiService);
   private readonly destroyRef = inject(DestroyRef);
-
-  protected readonly poses = POSES;
-  protected readonly expressions = EXPRESSIONS;
 
   protected readonly storyText = signal('');
   protected readonly file = signal<File | null>(null);
@@ -63,7 +53,13 @@ export class ComicContainerComponent {
 
   protected readonly supportLevels = SUPPORT_LEVELS;
   protected readonly supportLevel = signal<SupportLevel>(DEFAULT_OPTIONS.supportLevel);
-  private readonly options = computed<ComicOptions>(() => ({ supportLevel: this.supportLevel() }));
+  protected readonly feelingLabels = signal(DEFAULT_OPTIONS.feelingLabels);
+  protected readonly notes = signal(DEFAULT_OPTIONS.notes);
+  private readonly options = computed<ComicOptions>(() => ({
+    supportLevel: this.supportLevel(),
+    feelingLabels: this.feelingLabels(),
+    notes: this.notes(),
+  }));
 
   /** Set between checking the run time and the user's decision, and during the run itself. */
   protected readonly estimate = signal<ComicEstimate | null>(null);
@@ -122,6 +118,12 @@ export class ComicContainerComponent {
     this.supportLevel.set(level);
   }
 
+  /** The toggles change which LLM calls run, so any estimate is out of date. */
+  protected setToggle(toggle: 'feelingLabels' | 'notes', on: boolean): void {
+    this.estimate.set(null);
+    this[toggle].set(on);
+  }
+
   /** First step: shows the expected run time. Nothing is sent to the LLM until it is accepted. */
   protected checkRunTime(): void {
     if (!this.canCheck()) {
@@ -167,23 +169,8 @@ export class ComicContainerComponent {
     return this.file() ?? this.storyText();
   }
 
-  protected colorOf(name: string): string {
-    return this.castColors().get(name) ?? CAST_COLORS[0];
-  }
-
-  /** Places a bubble over its speaker's column, keeping it inside the panel. */
-  protected bubbleLayout(panel: Panel, line: Dialogue) {
-    const count = Math.max(panel.characters.length, 1);
-    const index = Math.max(
-      panel.characters.findIndex((c) => c.name === line.speaker),
-      0,
-    );
-    const speakerCenter = ((index + 0.5) / count) * 100;
-    const width = BUBBLE_WIDTHS[count] ?? BUBBLE_WIDTHS.at(-1)!;
-    const left = clamp(speakerCenter - width / 2, 0, 100 - width);
-    const tail = clamp(((speakerCenter - left) / width) * 100, 12, 88);
-    return { left, width, tail: `${tail}%` };
-  }
+  protected readonly colorFn = (name: string): string =>
+    this.castColors().get(name) ?? CAST_COLORS[0];
 
   protected setTitle(title: string): void {
     this.story.update((story) => story && { ...story, title });

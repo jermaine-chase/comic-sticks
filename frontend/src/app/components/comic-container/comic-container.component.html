@@ -34,6 +34,30 @@
       }
     </fieldset>
 
+    <fieldset class="settings">
+      <legend>Help with reading</legend>
+      <label class="setting-choice">
+        <input
+          type="checkbox"
+          name="feeling-labels"
+          [checked]="feelingLabels()"
+          [disabled]="loading()"
+          (change)="setToggle('feelingLabels', $any($event.target).checked)"
+        />
+        <span><strong>Feeling labels</strong> A word for how each character feels.</span>
+      </label>
+      <label class="setting-choice">
+        <input
+          type="checkbox"
+          name="notes"
+          [checked]="notes()"
+          [disabled]="loading()"
+          (change)="setToggle('notes', $any($event.target).checked)"
+        />
+        <span><strong>What it means</strong> Explains sayings and tricky words.</span>
+      </label>
+    </fieldset>
+
     <div class="composer-actions">
       <input
         #fileInput
@@ -104,97 +128,14 @@
 
       <div class="comic-grid">
         @for (panel of comic.panels; track $index; let panelIndex = $index) {
-          <figure class="panel-block">
-            <article
-              class="panel"
-              [class]="'scene-' + panel.scene"
-              [attr.aria-label]="'Panel ' + panel.panelNumber"
-            >
-              <p
-                class="caption"
-                contenteditable="true"
-                aria-label="Panel caption"
-                [appEditable]="panel.caption"
-                (edited)="setCaption(panelIndex, $event)"
-              ></p>
-
-              <div class="bubbles">
-                @for (line of panel.dialogue; track $index; let lineIndex = $index) {
-                  @let layout = bubbleLayout(panel, line);
-                  <p
-                    class="bubble"
-                    [class]="'bubble-' + line.type"
-                    contenteditable="true"
-                    [attr.aria-label]="line.speaker + ' says'"
-                    [style.width.%]="layout.width"
-                    [style.margin-left.%]="layout.left"
-                    [style.--tail-x]="layout.tail"
-                    [appEditable]="line.text"
-                    (edited)="setDialogue(panelIndex, lineIndex, $event)"
-                  ></p>
-                }
-              </div>
-
-              <div class="stage">
-                @for (character of panel.characters; track $index; let characterIndex = $index) {
-                  <div class="actor">
-                    <app-stick-figure
-                      class="figure"
-                      [pose]="character.pose"
-                      [expression]="character.expression"
-                      [facing]="character.facing"
-                      [color]="colorOf(character.name)"
-                      [name]="character.name"
-                    />
-                    <span
-                      class="actor-name"
-                      contenteditable="true"
-                      spellcheck="false"
-                      aria-label="Character name"
-                      [appEditable]="character.name"
-                      (edited)="renameCharacter(character.name, $event)"
-                    ></span>
-                    <div class="actor-controls">
-                      <select
-                        [attr.aria-label]="character.name + ' pose'"
-                        (change)="
-                          updateCharacter(panelIndex, characterIndex, {
-                            pose: $any($event.target).value,
-                          })
-                        "
-                      >
-                        @for (pose of poses; track pose) {
-                          <option [value]="pose" [selected]="pose === character.pose">
-                            {{ pose }}
-                          </option>
-                        }
-                      </select>
-                      <select
-                        [attr.aria-label]="character.name + ' expression'"
-                        (change)="
-                          updateCharacter(panelIndex, characterIndex, {
-                            expression: $any($event.target).value,
-                          })
-                        "
-                      >
-                        @for (expression of expressions; track expression) {
-                          <option
-                            [value]="expression"
-                            [selected]="expression === character.expression"
-                          >
-                            {{ expression }}
-                          </option>
-                        }
-                      </select>
-                    </div>
-                  </div>
-                }
-              </div>
-            </article>
-            @if (panel.sourceText) {
-              <figcaption class="source-text">{{ panel.sourceText }}</figcaption>
-            }
-          </figure>
+          <app-comic-panel
+            [panel]="panel"
+            [colorOf]="colorFn"
+            (captionChange)="setCaption(panelIndex, $event)"
+            (dialogueChange)="setDialogue(panelIndex, $event.index, $event.text)"
+            (characterChange)="updateCharacter(panelIndex, $event.index, $event.change)"
+            (rename)="renameCharacter($event.from, $event.to)"
+          />
         }
       </div>
     </section>

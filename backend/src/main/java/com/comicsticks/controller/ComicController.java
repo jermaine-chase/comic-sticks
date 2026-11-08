@@ -47,8 +47,9 @@ public class ComicController {
     /** Predicts the run time for an uploaded .txt or .pdf file, without calling the LLM. */
     @PostMapping(path = "/estimate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ComicEstimateResponse estimateFromFile(@RequestParam("file") MultipartFile file,
-            @RequestParam(required = false) Integer supportLevel) {
-        return generator.estimate(validated(extractor.extract(file)), ComicOptions.of(supportLevel));
+            @RequestParam(required = false) Integer supportLevel,
+            @RequestParam(required = false) Boolean feelingLabels, @RequestParam(required = false) Boolean notes) {
+        return generator.estimate(validated(extractor.extract(file)), ComicOptions.of(supportLevel, feelingLabels, notes));
     }
 
     /** Generates a comic from raw story text sent as JSON. */
@@ -60,8 +61,9 @@ public class ComicController {
     /** Generates a comic from an uploaded .txt or .pdf file. */
     @PostMapping(path = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ComicStoryResponse generateFromFile(@RequestParam("file") MultipartFile file,
-            @RequestParam(required = false) Integer supportLevel) {
-        return generate(extractor.extract(file), ComicOptions.of(supportLevel));
+            @RequestParam(required = false) Integer supportLevel,
+            @RequestParam(required = false) Boolean feelingLabels, @RequestParam(required = false) Boolean notes) {
+        return generate(extractor.extract(file), ComicOptions.of(supportLevel, feelingLabels, notes));
     }
 
     private ComicStoryResponse generate(String rawText, ComicOptions options) {

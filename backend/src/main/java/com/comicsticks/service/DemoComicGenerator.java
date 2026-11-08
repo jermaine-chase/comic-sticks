@@ -1,7 +1,10 @@
 package com.comicsticks.service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,6 +19,7 @@ import com.comicsticks.dto.DialogueDto;
 import com.comicsticks.dto.DialogueType;
 import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.Facing;
+import com.comicsticks.dto.NoteDto;
 import com.comicsticks.dto.PanelDto;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.Scene;
@@ -24,22 +28,67 @@ import com.comicsticks.service.StorySegmenter.Part;
 /**
  * Keyless stand-in for {@link ComicGenerationService}, active under the {@code demo} profile so
  * the UI can be tried offline. It splits the story with the same {@link StorySegmenter} and fills
- * each panel by simple rules: quoted text becomes dialogue and the poses are cycled. Real
- * adaptation needs the LLM.
+ * every field by simple rules:
+ *
+ * <ul>
+ * <li>quoted text becomes a bubble for the character named nearby, a shout if it ends in "!" or is
+ * "shouted", and a whisper if it is "whispered";
+ * <li>a feeling word in the text, such as "afraid", becomes the feeling of the character it is
+ * about, and sets the face;
+ * <li>an opening phrase such as "Later that night" or "Back at the river" becomes the caption;
+ * <li>a short list of common idioms becomes "what it means" notes.
+ * </ul>
+ *
+ * Real adaptation needs the LLM.
  */
 @Service
 @Profile("demo")
 public class DemoComicGenerator implements ComicGenerator {
 
-    private static final Pattern SENTENCE = Pattern.compile("[^.!?]+[.!?]+[\"”]?|[^.!?]+$");
+    private static final Pattern SENTENCE = Pattern.compile("[^.!?]+[.!?]+[\"”']?|[^.!?]+$");
     private static final Pattern QUOTE = Pattern.compile("[\"“]([^\"”]+)[\"”]");
     private static final Pattern NAME = Pattern.compile("\\b[A-Z][a-z]{2,}\\b");
     private static final List<String> NOT_NAMES = List.of("The", "Then", "When", "She", "They", "But",
-            "And", "Once", "That", "There", "This", "His", "Her", "After", "Before", "Suddenly");
+            "And", "Once", "That", "There", "This", "His", "Her", "After", "Before", "Suddenly", "Chapter",
+            "Later", "Meanwhile", "Back", "Soon", "What", "Where", "Why", "How", "Yes", "Look", "Come");
+    private static final Pattern WHISPERED = Pattern.compile("(?i)\\bwhisper(ed|s|ing)?\\b");
+    private static final Pattern SHOUTED = Pattern.compile("(?i)\\b(shout|yell|scream|cr(y|ie))(ed|s|ing)?\\b");
+    private static final Pattern SCENE_CHANGE = Pattern.compile(
+            "^(?:Later(?: that \\w+)?|Meanwhile|Soon|Hours later|Days later|Years later|The next (?:day|morning|night)"
+                    + "|That (?:night|evening|morning|afternoon)|Back (?:at|in|on|home)(?: the \\w+)?)\\b");
+    private static final Pattern NIGHT = Pattern.compile("(?i)\\b(night|dark|moon|stars|midnight|evening)\\b");
+    private static final Pattern INDOOR = Pattern.compile(
+            "(?i)\\b(room|house|home|kitchen|attic|hall|burrow|cave|inside|bed|castle|school)\\b");
 
-    private static final Pose[] POSES = Pose.values();
-    private static final Expression[] EXPRESSIONS = Expression.values();
-    private static final Scene[] SCENES = {Scene.OUTDOOR, Scene.INDOOR, Scene.NIGHT, Scene.PLAIN};
+    /** Idioms the demo can explain, keyed by a pattern that finds them. */
+    private static final Map<Pattern, String> IDIOMS = new LinkedHashMap<>();
+
+    static {
+        idiom("(?:\\w+['’]s|his|her|my|their|our) heart sank",
+                "This means they suddenly felt very disappointed or worried. Their heart did not really move.");
+        idiom("raining cats and dogs", "This means it was raining very hard. No animals fell from the sky.");
+        idiom("butterflies in (?:his|her|my|their) (?:stomach|tummy)",
+                "This means they felt nervous. There were no real butterflies.");
+        idiom("over the moon", "This means very happy. Nobody went near the moon.");
+        idiom("piece of cake", "This means something was very easy. It has nothing to do with real cake.");
+        idiom("cold feet", "This means they felt too nervous to do something. Their feet were not really cold.");
+        idiom("lost (?:his|her|my|their) temper", "This means they suddenly became very angry.");
+        idiom("under the weather", "This means feeling a little ill.");
+        idiom("in a flash", "This means very quickly.");
+        idiom("couldn't believe (?:his|her|my|their) eyes",
+                "This means they were very surprised by what they saw. Their eyes were working fine.");
+        idiom("jumped out of (?:his|her|my|their) skin",
+                "This means they got a big fright. Nobody really left their skin.");
+        idiom("held (?:his|her|my|their) breath",
+                "This means they stopped breathing for a moment because they were nervous or waiting.");
+    }
+
+    private static void idiom(String regex, String meaning) {
+        IDIOMS.put(Pattern.compile("(?i)\\b" + regex + "\\b"), meaning);
+    }
+
+    private static final Pose[] POSES = {Pose.STANDING, Pose.WALKING, Pose.POINTING, Pose.WAVING, Pose.THINKING,
+            Pose.SITTING};
 
     private final StorySegmenter segmenter;
 
@@ -60,8 +109,10 @@ public class DemoComicGenerator implements ComicGenerator {
         for (Part part : segmenter.split(storyText, options.supportLevel())) {
             List<String> groups = sentenceGroups(part.text(), part.panels());
             for (int g = 0; g < groups.size(); g++) {
-                String source = g == groups.size() - 1 ? part.sourceText() : "";
-                panels.add(buildPanel(groups.get(g), panels.size(), cast, source));
+                boolean last = g == groups.size() - 1;
+                List<NoteDto> notes = last && options.notes() ? notes(part.sourceText()) : List.of();
+                PanelDto panel = buildPanel(groups.get(g), panels.size(), cast, options);
+                panels.add(panel.withText(last ? part.sourceText() : "", notes));
             }
         }
         return new ComicStoryResponse("Demo Comic", panels);
@@ -88,7 +139,7 @@ public class DemoComicGenerator implements ComicGenerator {
 
     private static List<String> findCast(String text) {
         List<String> names = NAME.matcher(text).results()
-                .map(m -> m.group())
+                .map(java.util.regex.MatchResult::group)
                 .filter(n -> !NOT_NAMES.contains(n))
                 .distinct()
                 .limit(2)
@@ -96,24 +147,98 @@ public class DemoComicGenerator implements ComicGenerator {
         return names.isEmpty() ? List.of("Hero") : names;
     }
 
-    private static PanelDto buildPanel(String text, int index, List<String> cast, String sourceText) {
+    private static PanelDto buildPanel(String text, int index, List<String> cast, ComicOptions options) {
+        List<DialogueDto> dialogue = dialogue(text, cast);
+        String feeling = options.feelingLabels() ? feeling(text) : "";
+        String feelingOwner = feeling.isEmpty() ? "" : nearestName(text, cast, text.toLowerCase(Locale.ROOT)
+                .indexOf(feeling));
+
         List<CharacterDto> characters = new ArrayList<>();
         for (int c = 0; c < cast.size(); c++) {
-            characters.add(new CharacterDto(
-                    cast.get(c),
-                    POSES[(index * cast.size() + c) % POSES.length],
-                    EXPRESSIONS[(index + c) % EXPRESSIONS.length],
-                    c == 0 ? Facing.RIGHT : Facing.LEFT));
+            String name = cast.get(c);
+            boolean feels = name.equals(feelingOwner);
+            Expression expression = feels
+                    ? FeelingExpressions.expressionFor(feeling).orElse(Expression.NEUTRAL) : Expression.NEUTRAL;
+            boolean speaks = dialogue.stream().anyMatch(d -> d.speaker().equals(name));
+            Pose pose = speaks && dialogue.stream().anyMatch(d -> d.type() == DialogueType.SHOUT) ? Pose.SHOUTING
+                    : POSES[(index + c) % POSES.length];
+            characters.add(new CharacterDto(name, pose, expression, c == 0 ? Facing.RIGHT : Facing.LEFT,
+                    feels ? feeling : ""));
         }
+        return new PanelDto(index + 1, scene(text), caption(text), characters, dialogue, "", List.of());
+    }
 
+    private static List<DialogueDto> dialogue(String text, List<String> cast) {
         List<DialogueDto> dialogue = new ArrayList<>();
         Matcher quote = QUOTE.matcher(text);
-        while (quote.find()) {
+        while (quote.find() && dialogue.size() < 3) {
             String line = quote.group(1).strip();
-            DialogueType type = line.endsWith("!") ? DialogueType.SHOUT : DialogueType.SPEECH;
-            dialogue.add(new DialogueDto(cast.get(dialogue.size() % cast.size()), line, type));
+            String after = text.substring(quote.end(), Math.min(text.length(), quote.end() + 30));
+            DialogueType type = WHISPERED.matcher(after).find() ? DialogueType.WHISPER
+                    : line.endsWith("!") || SHOUTED.matcher(after).find() ? DialogueType.SHOUT
+                    : DialogueType.SPEECH;
+            String speaker = nearestName(text, cast, quote.end());
+            if (speaker.isEmpty()) {
+                speaker = cast.get(dialogue.size() % cast.size());
+            }
+            dialogue.add(new DialogueDto(speaker, line, type));
         }
+        return dialogue;
+    }
 
-        return new PanelDto(index + 1, SCENES[index % SCENES.length], "", characters, dialogue, sourceText);
+    /** The cast member named closest to {@code position}, preferring a name just after it. */
+    private static String nearestName(String text, List<String> cast, int position) {
+        String best = "";
+        int bestDistance = Integer.MAX_VALUE;
+        for (String name : cast) {
+            Matcher m = Pattern.compile("\\b" + Pattern.quote(name) + "\\b").matcher(text);
+            while (m.find()) {
+                int distance = m.start() >= position ? m.start() - position : (position - m.end()) + 5;
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = name;
+                }
+            }
+        }
+        return best;
+    }
+
+    private static String feeling(String text) {
+        String lower = text.toLowerCase(Locale.ROOT);
+        int first = Integer.MAX_VALUE;
+        String found = "";
+        for (String word : FeelingExpressions.words()) {
+            Matcher m = Pattern.compile("\\b" + word + "\\b").matcher(lower);
+            if (m.find() && m.start() < first) {
+                first = m.start();
+                found = word;
+            }
+        }
+        return found;
+    }
+
+    private static String caption(String text) {
+        Matcher m = SCENE_CHANGE.matcher(text);
+        return m.find() ? m.group() + "..." : "";
+    }
+
+    private static Scene scene(String text) {
+        if (NIGHT.matcher(text).find()) {
+            return Scene.NIGHT;
+        }
+        return INDOOR.matcher(text).find() ? Scene.INDOOR : Scene.OUTDOOR;
+    }
+
+    /** Notes for the idioms the demo knows, quoting the phrase exactly as the text has it. */
+    static List<NoteDto> notes(String sourceText) {
+        String flat = sourceText.replaceAll("\\s+", " ");
+        List<NoteDto> notes = new ArrayList<>();
+        IDIOMS.forEach((pattern, meaning) -> {
+            Matcher m = pattern.matcher(flat);
+            if (m.find() && notes.size() < 3) {
+                notes.add(new NoteDto(m.group(), meaning));
+            }
+        });
+        return notes;
     }
 }

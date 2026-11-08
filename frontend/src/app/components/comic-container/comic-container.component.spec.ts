@@ -12,19 +12,35 @@ const STORY: ComicStory = {
       scene: 'indoor',
       caption: 'In the attic.',
       characters: [
-        { name: 'Mia', pose: 'pointing', expression: 'surprised', facing: 'right' },
-        { name: 'Leo', pose: 'standing', expression: 'neutral', facing: 'left' },
+        {
+          name: 'Mia',
+          pose: 'pointing',
+          expression: 'surprised',
+          facing: 'right',
+          feeling: 'surprised',
+        },
+        { name: 'Leo', pose: 'standing', expression: 'neutral', facing: 'left', feeling: '' },
       ],
       dialogue: [{ speaker: 'Mia', text: '<b>Look!</b>', type: 'shout' }],
       sourceText: '',
+      notes: [],
     },
     {
       panelNumber: 2,
       scene: 'plain',
       caption: '',
-      characters: [{ name: 'Leo', pose: 'thinking', expression: 'confused', facing: 'right' }],
+      characters: [
+        {
+          name: 'Leo',
+          pose: 'thinking',
+          expression: 'confused',
+          facing: 'right',
+          feeling: 'confused',
+        },
+      ],
       dialogue: [{ speaker: 'Leo', text: 'Hmm.', type: 'thought' }],
       sourceText: 'Mia pointed.\n"<b>Look!</b>" she shouted. Leo wondered.',
+      notes: [{ phrase: 'Leo wondered', meaning: 'Leo was not sure, and thought about it.' }],
     },
   ],
 };
@@ -91,7 +107,12 @@ describe('ComicContainerComponent', () => {
   it('posts the story and renders every panel', async () => {
     const request = await submitStory();
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ text: 'Mia found a map.', supportLevel: 1 });
+    expect(request.request.body).toEqual({
+      text: 'Mia found a map.',
+      supportLevel: 1,
+      feelingLabels: true,
+      notes: true,
+    });
 
     request.flush(STORY);
     await fixture.whenStable();
@@ -125,7 +146,19 @@ describe('ComicContainerComponent', () => {
 
     root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
     const request = http.expectOne('/api/comics/estimate');
-    expect(request.request.body).toEqual({ text: 'Mia found a map.', supportLevel: 2 });
+    expect(request.request.body).toMatchObject({ text: 'Mia found a map.', supportLevel: 2 });
+    request.flush(ESTIMATE);
+  });
+
+  it('sends the feeling and notes toggles so the server can skip that work', async () => {
+    await typeStory('Mia found a map.');
+    root.querySelector<HTMLInputElement>('input[name="feeling-labels"]')!.click();
+    root.querySelector<HTMLInputElement>('input[name="notes"]')!.click();
+    await fixture.whenStable();
+
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const request = http.expectOne('/api/comics/estimate');
+    expect(request.request.body).toMatchObject({ feelingLabels: false, notes: false });
     request.flush(ESTIMATE);
   });
 
@@ -215,7 +248,7 @@ describe('ComicContainerComponent', () => {
     select.dispatchEvent(new Event('change'));
     await fixture.whenStable();
 
-    expect(root.querySelector('svg')!.getAttribute('aria-label')).toBe(
+    expect(root.querySelector('app-stick-figure svg')!.getAttribute('aria-label')).toBe(
       'Mia, running, looking surprised',
     );
   });

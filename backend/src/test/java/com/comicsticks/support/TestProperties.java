@@ -11,7 +11,7 @@ public final class TestProperties {
     }
 
     public static ComicProperties.Llm llm(String baseUrl, String key) {
-        return new ComicProperties.Llm(baseUrl, key, "test-model", Duration.ofSeconds(5), 1000, 2, 3);
+        return new ComicProperties.Llm(baseUrl, key, "test-model", Duration.ofSeconds(5), 1000, 2, 3, 1);
     }
 
     public static ComicProperties.Story story(int maxPanels) {

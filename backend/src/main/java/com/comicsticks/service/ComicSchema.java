@@ -1,5 +1,6 @@
 package com.comicsticks.service;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,16 +30,29 @@ final class ComicSchema {
     }
 
     static Map<String, Object> story(int maxPanels) {
-        Map<String, Object> character = object(
-                "name", string(),
-                "pose", enumOf(Pose.values()),
-                "expression", enumOf(Expression.values()),
-                "facing", enumOf(Facing.values()));
+        return story(maxPanels, true);
+    }
 
+    /**
+     * @param feelings whether each character carries a feeling word. It comes before the face, so
+     *                 the model names the feeling first and then draws it.
+     */
+    static Map<String, Object> story(int maxPanels, boolean feelings) {
+        List<Object> characterFields = new ArrayList<>(List.of("name", string()));
+        if (feelings) {
+            characterFields.addAll(List.of("feeling", string()));
+        }
+        characterFields.addAll(List.of(
+                "expression", enumOf(Expression.values()),
+                "pose", enumOf(Pose.values()),
+                "facing", enumOf(Facing.values())));
+        Map<String, Object> character = object(characterFields.toArray());
+
+        // The type comes before the words, so the model decides first whether a line was spoken.
         Map<String, Object> dialogue = object(
                 "speaker", string(),
-                "text", string(),
-                "type", enumOf(DialogueType.values()));
+                "type", enumOf(DialogueType.values()),
+                "text", string());
 
         Map<String, Object> panel = object(
                 "panelNumber", Map.of("type", "integer"),
@@ -50,6 +64,14 @@ final class ComicSchema {
         return object(
                 "title", string(),
                 "panels", arrayOf(panel, 1, maxPanels));
+    }
+
+    /** The reply for the separate, small "what it means" call. */
+    static Map<String, Object> notes(int maxNotes) {
+        Map<String, Object> note = object(
+                "phrase", string(),
+                "meaning", string());
+        return object("notes", arrayOf(note, 0, maxNotes));
     }
 
     /** Builds an object schema from alternating property names and schemas, keeping their order. */
