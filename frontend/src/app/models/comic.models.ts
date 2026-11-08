@@ -53,6 +53,8 @@ export interface Panel {
   caption: string;
   characters: ComicCharacter[];
   dialogue: Dialogue[];
+  /** The book's own words for this panel, exactly as written. Empty when a later panel has them. */
+  sourceText: string;
 }
 
 export interface ComicStory {

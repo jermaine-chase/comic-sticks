@@ -107,6 +107,36 @@ class ComicGenerationServiceTest {
     }
 
     @Test
+    void putsEachPartsExactTextUnderItsLastPanelAndCoversTheWholeStory() {
+        String panel = STORY_JSON.substring(STORY_JSON.indexOf("{\"panelNumber"), STORY_JSON.lastIndexOf(']'));
+        String two = "{\"title\":\"T\",\"panels\":[" + panel + "," + panel + "]}";
+        String noPanels = "{\"title\":\"T\",\"panels\":[]}";
+        String partOne = "Mia found the old map\nin the attic, under a pile of coats.";
+        String partTwo = "Leo followed the map to the cave.";
+        server.expect(requestTo("https://llm.test/v1/chat/completions"))
+                .andRespond(withSuccess(chatReply(two, "stop"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://llm.test/v1/chat/completions"))
+                .andRespond(withSuccess(chatReply(noPanels, "stop"), MediaType.APPLICATION_JSON));
+
+        ComicStoryResponse story = service.generate(partOne + "\n\n" + partTwo);
+
+        assertThat(story.panels()).extracting(p -> p.sourceText()).endsWith(partOne, partTwo);
+        assertThat(story.panels().stream().map(p -> p.sourceText()).filter(s -> !s.isEmpty()))
+                .containsExactly(partOne, partTwo);
+        server.verify();
+    }
+
+    @Test
+    void ignoresAnySourceTextTheLlmSends() {
+        String json = STORY_JSON.replace("\"dialogue\"", "\"sourceText\":\"Made up words\",\"dialogue\"");
+        server.expect(requestTo("https://llm.test/v1/chat/completions"))
+                .andRespond(withSuccess(chatReply(json, "stop"), MediaType.APPLICATION_JSON));
+
+        assertThat(service.generate("Once upon a time").panels().getFirst().sourceText())
+                .isEqualTo("Once upon a time");
+    }
+
+    @Test
     void aFailedPartFailsTheComic() {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(chatReply(STORY_JSON, "stop"), MediaType.APPLICATION_JSON));

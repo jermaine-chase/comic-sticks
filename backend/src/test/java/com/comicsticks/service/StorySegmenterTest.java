@@ -32,6 +32,34 @@ class StorySegmenterTest {
         return parts.stream().mapToInt(Part::panels).sum();
     }
 
+    /** Compares words only, so the test ignores whitespace normalization. */
+    static String words(String text) {
+        return String.join(" ", text.strip().split("\\s+"));
+    }
+
+    @Test
+    void sourceTextJoinedTogetherReproducesTheOriginalText() {
+        String story = "Chapter 1\r\n\r\nMia found a dusty\nold map.  \"Look!\" she said.\r\n\r\n"
+                + IntStream.range(0, 30).mapToObj(i -> "Paragraph " + i + " goes on a while.\n\n")
+                        .collect(Collectors.joining())
+                + sentences(40) + "\n\n\n   The end.  ";
+
+        List<Part> parts = segmenter.split(story);
+
+        String joined = parts.stream().map(Part::sourceText).collect(Collectors.joining(" "));
+        assertThat(words(joined)).isEqualTo(words(story));
+    }
+
+    @Test
+    void sourceTextKeepsTheStorysOwnLineBreaksAndSpacing() {
+        String paragraph = "Mia found a dusty\nold map.  “Look!” she said.";
+
+        List<Part> parts = segmenter.split(paragraph + "\r\n\r\nLeo followed her up the ladder, frowning.");
+
+        assertThat(parts.getFirst().sourceText()).isEqualTo(paragraph);
+        assertThat(parts.getFirst().text()).isEqualTo("Mia found a dusty old map. “Look!” she said.");
+    }
+
     @Test
     void makesOnePartPerParagraph() {
         String first = "Mia found a dusty old map up in the attic.";

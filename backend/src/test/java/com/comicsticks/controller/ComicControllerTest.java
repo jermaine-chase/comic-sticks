@@ -41,7 +41,8 @@ class ComicControllerTest {
                 .andExpect(jsonPath("$.panels[0].panelNumber").value(1))
                 .andExpect(jsonPath("$.panels[0].characters[0].name").value("Mia"))
                 .andExpect(jsonPath("$.panels[0].characters[0].pose").value("standing"))
-                .andExpect(jsonPath("$.panels[1].dialogue[0].type").value("shout"));
+                .andExpect(jsonPath("$.panels[0].dialogue[0].type").value("shout"))
+                .andExpect(jsonPath("$.panels[0].sourceText").value("Mia waved. \"Hello there!\" she said."));
     }
 
     @Test
@@ -50,7 +51,7 @@ class ComicControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"text\":\"Mia waved. Leo ran.\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.panels").value(2))
+                .andExpect(jsonPath("$.panels").value(1))
                 .andExpect(jsonPath("$.parts").value(1))
                 .andExpect(jsonPath("$.estimatedSeconds").value(1));
     }
@@ -79,7 +80,7 @@ class ComicControllerTest {
 
         mvc.perform(multipart("/api/comics/generate").file(file))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.panels[0].caption").value("Mia ran home."));
+                .andExpect(jsonPath("$.panels[0].sourceText").value("Mia ran home."));
     }
 
     @Test
@@ -88,7 +89,7 @@ class ComicControllerTest {
 
         mvc.perform(multipart("/api/comics/generate").file(file))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.panels[0].caption").value("Mia ran home."));
+                .andExpect(jsonPath("$.panels[0].sourceText").value("Mia ran home."));
     }
 
     @Test

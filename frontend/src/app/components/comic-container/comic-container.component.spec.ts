@@ -16,6 +16,7 @@ const STORY: ComicStory = {
         { name: 'Leo', pose: 'standing', expression: 'neutral', facing: 'left' },
       ],
       dialogue: [{ speaker: 'Mia', text: '<b>Look!</b>', type: 'shout' }],
+      sourceText: '',
     },
     {
       panelNumber: 2,
@@ -23,6 +24,7 @@ const STORY: ComicStory = {
       caption: '',
       characters: [{ name: 'Leo', pose: 'thinking', expression: 'confused', facing: 'right' }],
       dialogue: [{ speaker: 'Leo', text: 'Hmm.', type: 'thought' }],
+      sourceText: 'Mia pointed.\n"<b>Look!</b>" she shouted. Leo wondered.',
     },
   ],
 };
@@ -139,6 +141,17 @@ describe('ComicContainerComponent', () => {
     await fixture.whenStable();
     expect(root.querySelector('.loading')).toBeNull();
     expect(root.querySelector('.confirm')).toBeNull();
+  });
+
+  it('shows the exact source text once, under the last panel of its part', async () => {
+    await renderStory();
+
+    const blocks = root.querySelectorAll('.panel-block');
+    expect(blocks[0].querySelector('.source-text')).toBeNull();
+    const source = blocks[1].querySelector<HTMLElement>('.source-text')!;
+    expect(source.textContent).toBe('Mia pointed.\n"<b>Look!</b>" she shouted. Leo wondered.');
+    expect(source.querySelector('b')).toBeNull();
+    expect(source.hasAttribute('contenteditable')).toBe(false);
   });
 
   it('shows story markup as literal text', async () => {

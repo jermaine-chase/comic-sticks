@@ -228,6 +228,23 @@ textarea:disabled {
   box-shadow: 6px 6px 0 var(--ink);
 }
 
+.panel-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+/* The book's own words, kept plain and large so they read like the page of the book. */
+.source-text {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  font: 1.2rem / 1.55 var(--font-reading, var(--font-comic));
+  white-space: pre-line;
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
 .panel {
   position: relative;
   display: flex;

@@ -78,7 +78,7 @@ public class ComicStoryNormalizer {
                 .toList());
 
         return new PanelDto(number, panel.scene() == null ? Scene.PLAIN : panel.scene(),
-                caption, characters, dialogue);
+                caption, characters, dialogue, panel.sourceText() == null ? "" : panel.sourceText());
     }
 
     private static CharacterDto normalizeCharacter(CharacterDto c) {

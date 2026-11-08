@@ -32,7 +32,7 @@ class ComicStoryNormalizerTest {
             new CharacterDto("Mia", Pose.WAVING, Expression.HAPPY, Facing.RIGHT);
 
     private static PanelDto panel(int number, List<CharacterDto> characters, List<DialogueDto> dialogue) {
-        return new PanelDto(number, Scene.PLAIN, "", characters, dialogue);
+        return new PanelDto(number, Scene.PLAIN, "", characters, dialogue, "");
     }
 
     @Test
@@ -68,18 +68,19 @@ class ComicStoryNormalizerTest {
     @Test
     void movesNarratorLinesIntoTheCaption() {
         var line = new DialogueDto("Narrator", "Years passed.", DialogueType.SPEECH);
-        var input = new PanelDto(1, Scene.PLAIN, "Later.", List.of(MIA), List.of(line));
+        var input = new PanelDto(1, Scene.PLAIN, "Later.", List.of(MIA), List.of(line), "Years passed.");
 
         PanelDto result = normalizer.normalize(new ComicStoryResponse("T", List.of(input))).panels().getFirst();
 
         assertThat(result.dialogue()).isEmpty();
         assertThat(result.caption()).isEqualTo("Later. Years passed.");
+        assertThat(result.sourceText()).isEqualTo("Years passed.");
     }
 
     @Test
     void fillsNullsWithDefaults() {
         var bare = new CharacterDto("Mia", null, null, null);
-        var input = new PanelDto(0, null, null, Collections.singletonList(bare), null);
+        var input = new PanelDto(0, null, null, Collections.singletonList(bare), null, null);
 
         ComicStoryResponse story = normalizer.normalize(new ComicStoryResponse(null, List.of(input)));
 
@@ -88,6 +89,7 @@ class ComicStoryNormalizerTest {
         assertThat(result.scene()).isEqualTo(Scene.PLAIN);
         assertThat(result.caption()).isEmpty();
         assertThat(result.dialogue()).isEmpty();
+        assertThat(result.sourceText()).isEmpty();
         assertThat(result.characters().getFirst().pose()).isEqualTo(Pose.STANDING);
     }
 

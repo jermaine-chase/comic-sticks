@@ -121,13 +121,11 @@ public class ComicGenerationService implements ComicGenerator {
             log.info("Part {} of {}: {} panels allowed, took {} ms", i + 1, parts.size(), part.panels(),
                     (System.nanoTime() - start) / 1_000_000);
 
-            if (result == null || result.panels() == null) {
-                continue;
-            }
-            if (title.isBlank() && result.title() != null) {
+            if (result != null && title.isBlank() && result.title() != null) {
                 title = result.title();
             }
-            List<PanelDto> partPanels = withinBudget(result.panels(), part.panels());
+            List<PanelDto> partPanels = withSourceText(
+                    withinBudget(result == null ? null : result.panels(), part.panels()), part);
             panels.addAll(partPanels);
             partPanels.stream()
                     .filter(Objects::nonNull)
@@ -161,9 +159,28 @@ public class ComicGenerationService implements ComicGenerator {
 
     /** Providers without strict schema support can overrun, so keep each part's closing panel. */
     private static List<PanelDto> withinBudget(List<PanelDto> panels, int budget) {
-        if (panels.size() <= budget) {
-            return panels;
+        List<PanelDto> present = panels == null ? List.of() : panels.stream().filter(Objects::nonNull).toList();
+        return present.size() <= budget ? present : trimmed(present, budget);
+    }
+
+    /**
+     * Puts the part's exact text under its last panel, whatever the LLM sent. A part that came back
+     * with no panels still gets a plain one, so none of the story's words go missing.
+     */
+    static List<PanelDto> withSourceText(List<PanelDto> panels, Part part) {
+        if (panels.isEmpty()) {
+            return List.of(new PanelDto(0, null, "", List.of(), List.of(), part.sourceText()));
         }
+        List<PanelDto> result = new ArrayList<>();
+        for (int i = 0; i < panels.size(); i++) {
+            PanelDto p = panels.get(i);
+            String source = i == panels.size() - 1 ? part.sourceText() : "";
+            result.add(new PanelDto(p.panelNumber(), p.scene(), p.caption(), p.characters(), p.dialogue(), source));
+        }
+        return result;
+    }
+
+    private static List<PanelDto> trimmed(List<PanelDto> panels, int budget) {
         List<PanelDto> kept = new ArrayList<>(panels.subList(0, budget - 1));
         kept.add(panels.getLast());
         return kept;
