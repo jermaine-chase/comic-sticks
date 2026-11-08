@@ -84,6 +84,8 @@ export interface ComicStory {
   /** The character sheet every figure is drawn from. */
   characters: CharacterDesign[];
   places: Place[];
+  /** The chapter's opening "Who's who" and closing "What happened". */
+  bookends: ChapterBookends | null;
 }
 
 // --- Character sheet: matches the Java enums CharacterKind, Hat, Hair, Accessory, Ears,
@@ -197,12 +199,50 @@ export interface ComicOptions {
   feelingLabels: boolean;
   /** "What it means" notes for idioms and other tricky phrases. When off, they are not generated. */
   notes: boolean;
+  /** Simple comprehension questions with picture answers at the end of each chapter. */
+  questions: boolean;
 }
 
-export const DEFAULT_OPTIONS: ComicOptions = { supportLevel: 1, feelingLabels: true, notes: true };
+export const DEFAULT_OPTIONS: ComicOptions = {
+  supportLevel: 1,
+  feelingLabels: true,
+  notes: true,
+  questions: false,
+};
 
 export interface ComicEstimate {
   parts: number;
   panels: number;
   estimatedSeconds: number;
+}
+
+// --- Chapter bookends ----------------------------------------------------------------------
+
+/** What opens and closes a chapter. */
+export interface ChapterBookends {
+  whosWho: { characters: string[]; whereWeAre: string };
+  /** 3 to 5 sentences. The last says how the main character feels at the end. */
+  recap: RecapItem[];
+  /** Empty when questions are off. */
+  questions: Question[];
+}
+
+/** A recap sentence with its thumbnail: a panel, or a small figure of a character. */
+export interface RecapItem {
+  sentence: string;
+  panelNumber: number | null;
+  character: string | null;
+  expression: Expression | null;
+}
+
+/** A question whose answers are pictures: characters or panels from the chapter. */
+export interface Question {
+  question: string;
+  choices: AnswerChoice[];
+  answerIndex: number;
+}
+
+export interface AnswerChoice {
+  character: string | null;
+  panelNumber: number | null;
 }

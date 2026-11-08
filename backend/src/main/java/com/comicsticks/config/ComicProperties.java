@@ -5,7 +5,7 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("comic")
-public record ComicProperties(Llm llm, Story story, Characters characters) {
+public record ComicProperties(Llm llm, Story story, Characters characters, Bookends bookends) {
 
     public record Llm(
             String baseUrl,
@@ -16,7 +16,19 @@ public record ComicProperties(Llm llm, Story story, Characters characters) {
             double secondsPerPart,
             double secondsPerPanel,
             double secondsPerNotesCall,
-            double secondsPerCharacterChunk) {
+            double secondsPerCharacterChunk,
+            double secondsPerBookendsCall,
+            double secondsPerQuestionsCall) {
+    }
+
+    /**
+     * The chapter's opening and closing pages.
+     *
+     * @param maxInputChars  most text sent to the recap and questions calls; each panel's text is
+     *                       shortened, and panels are sampled evenly when there are too many
+     * @param panelTextChars how much of each panel's text goes into that summary
+     */
+    public record Bookends(int maxInputChars, int panelTextChars) {
     }
 
     /**

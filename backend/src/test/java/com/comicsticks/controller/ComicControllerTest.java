@@ -1,6 +1,8 @@
 package com.comicsticks.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -104,6 +106,26 @@ class ComicControllerTest {
         mvc.perform(multipart("/api/comics/generate").file(file).param("characterSheet", edited))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.characters[0].hat").value("top_hat"));
+    }
+
+    @Test
+    void endsEveryComicWithBookendsAndAddsQuestionsWhenAsked() throws Exception {
+        String story = "Mole met Ratty by the river. \\\"Hello!\\\" said Mole.\\n\\nRatty waved back.\\n\\n"
+                + "They rowed home.";
+        mvc.perform(post("/api/comics/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookends.whosWho.characters[0]").value("Mole"))
+                .andExpect(jsonPath("$.bookends.whosWho.whereWeAre").value("We are at the river bank."))
+                .andExpect(jsonPath("$.bookends.recap[*].sentence", hasItem(startsWith("At the end, "))))
+                .andExpect(jsonPath("$.bookends.questions").isEmpty());
+        var file = new MockMultipartFile("file", "story.txt", "text/plain",
+                story.replace("\\n", "\n").replace("\\\"", "\"").getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/comics/generate").file(file).param("questions", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookends.questions[0].question").value("Who said \"Hello!\"?"))
+                .andExpect(jsonPath("$.bookends.questions[0].choices[0].character").value("Mole"));
     }
 
     @Test

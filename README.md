@@ -111,7 +111,25 @@ A known feeling word sets the face (`FeelingExpressions`), so the label and face
 The frontend enforces the layout whatever the LLM chose: fixed figure slots, bubbles above their
 speakers, tails measured to end at the speaker's head, and speakers turned to face their listener.
 
+### Chapter bookends
+
+Every comic opens and closes the same way (`bookends` in the response):
+
+- **Who's who**: everyone who appears in the chapter, drawn from the sheet and named, plus one
+  plain "Where we are" line. It is built in code from the panels.
+- **What happened**: 2 to 4 short sentences, each tied to a panel shown as a thumbnail, from one
+  small recap call. The code then adds the closing line itself ("At the end, Mole feels proud.")
+  with a small figure of the main character, so the recap always ends with how they feel.
+- **Questions** (`questions`, off by default): one more small call writes 2 or 3 questions and
+  picks each answer from the chapter's characters or panel numbers. The code adds the wrong
+  choices, so every answer is a picture the reader has seen.
+
+`BookendsRules` checks everything the LLM suggests: panel numbers must exist, the main character
+must be in the chapter, and sentences stay short. `comic.bookends.*` limits how much of the
+chapter the calls see.
+
 The estimate is `parts x (seconds-per-part + seconds-per-notes-call) + panels x seconds-per-panel`
+`+ seconds-per-bookends-call (+ seconds-per-questions-call)`
 (+ `chunks x seconds-per-character-chunk` when no sheet is supplied)
 (all under `comic.llm`; the notes term only when notes are on, and retries are not counted). The
 defaults were measured with `qwen2.5-coder:7b` on one machine with the model already loaded, so
@@ -133,8 +151,9 @@ curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf" -F "support
 Pass that sheet back, edited, as `characterSheet` (a JSON object, or a JSON string form field in a
 multipart request) to `/estimate` and `/generate`.
 
-`supportLevel` (default 1), `feelingLabels` and `notes` (both default `true`) are optional. When a
-toggle is off, that field is not requested from the LLM at all.
+`supportLevel` (default 1), `feelingLabels` and `notes` (both default `true`) and `questions`
+(default `false`) are optional. When a toggle is off, that field is not requested from the LLM at
+all.
 
 An estimate response:
 
@@ -159,7 +178,17 @@ A generate response:
       "sourceText": "Mia found a map in the attic. \"Look at this!\" she shouted.",
       "notes": []
     }
-  ]
+  ],
+  "characters": [],
+  "places": [],
+  "bookends": {
+    "whosWho": { "characters": ["Mia"], "whereWeAre": "We are in the attic, on a rainy day." },
+    "recap": [
+      { "sentence": "Mia found a map.", "panelNumber": 1, "character": null, "expression": null },
+      { "sentence": "At the end, Mia feels excited.", "panelNumber": null, "character": "Mia", "expression": "excited" }
+    ],
+    "questions": []
+  }
 }
 ```
 

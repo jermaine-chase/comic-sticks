@@ -15,6 +15,8 @@ import com.comicsticks.dto.Expression;
 final class FeelingExpressions {
 
     private static final Map<String, Expression> WORDS = new LinkedHashMap<>();
+    private static final Set<String> FILLER = Set.of("a", "an", "the", "very", "so", "quite", "really", "bit",
+            "little", "feeling", "feels", "felt", "and", "but", "too", "more", "most", "of");
 
     static {
         add(Expression.SCARED, "scared", "afraid", "frightened", "terrified", "fearful", "panicked");
@@ -30,7 +32,7 @@ final class FeelingExpressions {
         add(Expression.DETERMINED, "determined", "brave", "bold", "focused", "stubborn");
         add(Expression.TIRED, "tired", "sleepy", "exhausted", "weary", "bored");
         add(Expression.HAPPY, "happy", "glad", "cheerful", "joyful", "pleased", "content", "relieved", "calm",
-                "grateful", "thankful", "friendly", "loving");
+                "grateful", "thankful", "friendly", "loving", "safe", "warm", "cosy", "cozy");
     }
 
     private FeelingExpressions() {
@@ -62,7 +64,12 @@ final class FeelingExpressions {
                 return word;
             }
         }
-        String last = words[words.length - 1];
-        return last.length() > 20 ? "" : last;
+        // An unknown feeling: its first real word, so "very chilly and wet" becomes "chilly".
+        for (String word : words) {
+            if (!FILLER.contains(word) && !word.isEmpty()) {
+                return word.length() > 20 ? "" : word;
+            }
+        }
+        return "";
     }
 }

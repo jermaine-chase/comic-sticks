@@ -127,15 +127,17 @@ public class ComicGenerationService implements ComicGenerator {
     }
 
     /**
-     * {@code parts x (per part + per notes call) + panels x per panel}, plus the character pass when
-     * there is no sheet yet. Retries are not counted.
+     * {@code parts x (per part + per notes call) + panels x per panel + bookends (+ questions)}, plus
+     * the character pass when there is no sheet yet. Retries are not counted.
      */
     @Override
     public ComicEstimateResponse estimate(String storyText, ComicOptions options, boolean hasSheet) {
         List<Part> parts = segmenter.split(storyText, options.supportLevel());
         int panels = parts.stream().mapToInt(Part::panels).sum();
         double perPart = llmProperties.secondsPerPart() + (options.notes() ? llmProperties.secondsPerNotesCall() : 0);
-        double seconds = parts.size() * perPart + panels * llmProperties.secondsPerPanel();
+        double seconds = parts.size() * perPart + panels * llmProperties.secondsPerPanel()
+                + llmProperties.secondsPerBookendsCall()
+                + (options.questions() ? llmProperties.secondsPerQuestionsCall() : 0);
         if (!hasSheet) {
             seconds += finder.calls(storyText) * llmProperties.secondsPerCharacterChunk();
         }

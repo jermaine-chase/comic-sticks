@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
  * @param supportLevel   1, 2 or 3; 1 when absent
  * @param feelingLabels  feeling tags on or off; on when absent
  * @param notes          "what it means" notes on or off; on when absent
+ * @param questions      comprehension questions at the end of the chapter on or off; off when absent
  * @param characterSheet the reviewed sheet to draw from; when absent, the character pass runs first
  */
 public record GenerateComicRequest(
@@ -16,9 +17,10 @@ public record GenerateComicRequest(
         Integer supportLevel,
         Boolean feelingLabels,
         Boolean notes,
+        Boolean questions,
         CharacterSheet characterSheet) {
 
     public ComicOptions options() {
-        return ComicOptions.of(supportLevel, feelingLabels, notes);
+        return ComicOptions.of(supportLevel, feelingLabels, notes, questions);
     }
 }

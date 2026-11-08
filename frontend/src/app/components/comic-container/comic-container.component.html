@@ -56,6 +56,16 @@
         />
         <span><strong>What it means</strong> Explains sayings and tricky words.</span>
       </label>
+      <label class="setting-choice">
+        <input
+          type="checkbox"
+          name="questions"
+          [checked]="questions()"
+          [disabled]="loading()"
+          (change)="setToggle('questions', $any($event.target).checked)"
+        />
+        <span><strong>Questions</strong> A few picture questions at the end.</span>
+      </label>
     </fieldset>
 
     <div class="composer-actions">
@@ -152,6 +162,13 @@
       <p class="hint">Click any text to edit it. Hover over a figure to change its pose or face.</p>
 
       <div class="comic-grid">
+        @if (comic.bookends; as bookends) {
+          <app-whos-who
+            [characters]="bookends.whosWho.characters"
+            [whereWeAre]="bookends.whosWho.whereWeAre"
+            [designs]="comic.characters"
+          />
+        }
         @for (panel of comic.panels; track $index; let panelIndex = $index) {
           <app-comic-panel
             [panel]="panel"
@@ -165,6 +182,25 @@
           />
         }
       </div>
+
+      @if (comic.bookends; as bookends) {
+        <div class="chapter-end">
+          <app-recap
+            [recap]="bookends.recap"
+            [panels]="comic.panels"
+            [designs]="comic.characters"
+            [places]="comic.places"
+          />
+          @if (bookends.questions.length) {
+            <app-questions
+              [questions]="bookends.questions"
+              [panels]="comic.panels"
+              [designs]="comic.characters"
+              [places]="comic.places"
+            />
+          }
+        </div>
+      }
     </section>
   }
 </main>

@@ -242,8 +242,10 @@ class ComicGenerationServiceTest {
     void estimateCountsTheNotesCallOnlyWhenNotesAreOn() {
         String story = "Mia found the old map in the attic.\n\nLeo followed it to the cave.";
 
-        assertThat(service.estimate(story, ComicOptions.DEFAULTS, true).estimatedSeconds()).isEqualTo(2 * (2 + 1) + 2 * 3);
-        assertThat(service.estimate(story, NO_NOTES, true).estimatedSeconds()).isEqualTo(2 * 2 + 2 * 3);
+        assertThat(service.estimate(story, ComicOptions.DEFAULTS, true).estimatedSeconds()).isEqualTo(2 * (2 + 1) + 2 * 3 + 4);
+        assertThat(service.estimate(story, NO_NOTES, true).estimatedSeconds()).isEqualTo(2 * 2 + 2 * 3 + 4);
+        assertThat(service.estimate(story, new ComicOptions(SupportLevel.PARAGRAPH, true, false, true), true)
+                .estimatedSeconds()).as("questions add their call").isEqualTo(2 * 2 + 2 * 3 + 4 + 3);
     }
 
     private static String chatReply(String content, String finishReason) {
@@ -358,7 +360,7 @@ class ComicGenerationServiceTest {
 
         assertThat(estimate.parts()).isEqualTo(2);
         assertThat(estimate.panels()).isEqualTo(2);
-        assertThat(estimate.estimatedSeconds()).isEqualTo(2 * 2 + 2 * 3);
+        assertThat(estimate.estimatedSeconds()).isEqualTo(2 * 2 + 2 * 3 + 4);
         server.verify();
     }
 

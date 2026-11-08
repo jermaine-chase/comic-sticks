@@ -52,6 +52,28 @@ const STORY: ComicStory = {
   ],
   characters: [],
   places: [{ name: 'The attic', description: 'A dusty room.', background: 'room' }],
+  bookends: {
+    whosWho: { characters: ['Mia', 'Leo'], whereWeAre: 'We are in the attic.' },
+    recap: [
+      { sentence: 'Mia found a map.', panelNumber: 2, character: null, expression: null },
+      {
+        sentence: 'At the end, Mia feels surprised.',
+        panelNumber: null,
+        character: 'Mia',
+        expression: 'surprised',
+      },
+    ],
+    questions: [
+      {
+        question: 'Who shouted?',
+        choices: [
+          { character: 'Leo', panelNumber: null },
+          { character: 'Mia', panelNumber: null },
+        ],
+        answerIndex: 1,
+      },
+    ],
+  },
 };
 
 const MIA: CharacterDesign = {
@@ -148,6 +170,7 @@ describe('ComicContainerComponent', () => {
       supportLevel: 1,
       feelingLabels: true,
       notes: true,
+      questions: false,
       characterSheet: SHEET,
     });
 
@@ -156,9 +179,21 @@ describe('ComicContainerComponent', () => {
 
     expect(root.querySelector('.comic-grid')).toBeTruthy();
     expect(root.querySelectorAll('.panel').length).toBe(2);
-    expect(root.querySelectorAll('app-stick-figure').length).toBe(3);
+    expect(root.querySelectorAll('.panel app-stick-figure').length).toBe(3);
     expect(root.querySelector('.bubble-shout')).toBeTruthy();
     expect(root.querySelector('.bubble-thought')).toBeTruthy();
+  });
+
+  it('opens the chapter with who is who and closes it with what happened and questions', async () => {
+    await renderStory();
+
+    const grid = root.querySelector('.comic-grid')!;
+    expect(grid.firstElementChild!.tagName.toLowerCase()).toBe('app-whos-who');
+    expect(grid.querySelector('app-whos-who')!.textContent).toContain('We are in the attic.');
+    const recap = root.querySelector('app-recap')!;
+    expect(recap.textContent).toContain('At the end, Mia feels surprised.');
+    expect(recap.querySelector('app-panel-thumbnail')).toBeTruthy();
+    expect(root.querySelector('app-questions')!.textContent).toContain('Who shouted?');
   });
 
   it('shows the estimate and calls nothing further until confirmed', async () => {
@@ -285,7 +320,7 @@ describe('ComicContainerComponent', () => {
     select.dispatchEvent(new Event('change'));
     await fixture.whenStable();
 
-    expect(root.querySelector('app-stick-figure svg')!.getAttribute('aria-label')).toBe(
+    expect(root.querySelector('.panel app-stick-figure svg')!.getAttribute('aria-label')).toBe(
       'Mia, running, looking surprised',
     );
   });

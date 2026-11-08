@@ -266,3 +266,12 @@ textarea:disabled {
 [contenteditable]:focus {
   outline-color: var(--accent);
 }
+
+/* The chapter's closing: what happened, then the optional questions. */
+.chapter-end {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 1rem;
+  align-items: start;
+  margin-top: 1rem;
+}

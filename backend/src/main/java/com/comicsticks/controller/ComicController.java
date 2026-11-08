@@ -16,6 +16,7 @@ import com.comicsticks.dto.ComicOptions;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.GenerateComicRequest;
 import com.comicsticks.exception.ComicGenerationException;
+import com.comicsticks.service.BookendsWriter;
 import com.comicsticks.service.CharacterFinder;
 import com.comicsticks.service.ComicGenerator;
 import com.comicsticks.service.ComicStoryNormalizer;
@@ -38,13 +39,16 @@ public class ComicController {
     private final CharacterFinder finder;
     private final SheetRules sheetRules;
     private final ComicStoryNormalizer normalizer;
+    private final BookendsWriter bookends;
     private final StoryTextExtractor extractor;
     private final JsonMapper json = JsonMapper.builder().build();
     private final int maxInputChars;
 
     public ComicController(ComicGenerator generator, CharacterFinder finder, SheetRules sheetRules,
-            ComicStoryNormalizer normalizer, StoryTextExtractor extractor, ComicProperties properties) {
+            ComicStoryNormalizer normalizer, BookendsWriter bookends, StoryTextExtractor extractor,
+            ComicProperties properties) {
         this.generator = generator;
+        this.bookends = bookends;
         this.finder = finder;
         this.sheetRules = sheetRules;
         this.normalizer = normalizer;
@@ -63,9 +67,10 @@ public class ComicController {
     public ComicEstimateResponse estimateFromFile(@RequestParam("file") MultipartFile file,
             @RequestParam(required = false) Integer supportLevel,
             @RequestParam(required = false) Boolean feelingLabels, @RequestParam(required = false) Boolean notes,
+            @RequestParam(required = false) Boolean questions,
             @RequestParam(required = false) String characterSheet) {
         return generator.estimate(validated(extractor.extract(file)),
-                ComicOptions.of(supportLevel, feelingLabels, notes), hasSheet(sheet(characterSheet)));
+                ComicOptions.of(supportLevel, feelingLabels, notes, questions), hasSheet(sheet(characterSheet)));
     }
 
     /** Runs the character pass, so the sheet can be reviewed and edited before drawing. */
@@ -90,14 +95,17 @@ public class ComicController {
     public ComicStoryResponse generateFromFile(@RequestParam("file") MultipartFile file,
             @RequestParam(required = false) Integer supportLevel,
             @RequestParam(required = false) Boolean feelingLabels, @RequestParam(required = false) Boolean notes,
+            @RequestParam(required = false) Boolean questions,
             @RequestParam(required = false) String characterSheet) {
-        return generate(extractor.extract(file), ComicOptions.of(supportLevel, feelingLabels, notes),
+        return generate(extractor.extract(file), ComicOptions.of(supportLevel, feelingLabels, notes, questions),
                 sheet(characterSheet));
     }
 
+    /** Bookends are written last, on the normalized comic, so their panel numbers are final. */
     private ComicStoryResponse generate(String rawText, ComicOptions options, CharacterSheet sheet) {
-        return normalizer.normalize(generator.generate(validated(rawText), options,
+        ComicStoryResponse story = normalizer.normalize(generator.generate(validated(rawText), options,
                 sheet == null ? CharacterSheet.EMPTY : sheet));
+        return story.withBookends(bookends.write(story, options));
     }
 
     private static boolean hasSheet(CharacterSheet sheet) {

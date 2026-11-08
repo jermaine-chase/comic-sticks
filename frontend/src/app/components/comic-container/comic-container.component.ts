@@ -21,6 +21,9 @@ import {
 } from '../../services/comic-api.service';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
 import { CharacterSheetComponent } from '../character-sheet/character-sheet.component';
+import { QuestionsComponent } from '../bookends/questions.component';
+import { RecapComponent } from '../bookends/recap.component';
+import { WhosWhoComponent } from '../bookends/whos-who.component';
 import { ComicPanelComponent } from '../comic-panel/comic-panel.component';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
 
@@ -42,6 +45,9 @@ function describeDuration(seconds: number): string {
     StickFigureComponent,
     EditableTextDirective,
     ComicPanelComponent,
+    WhosWhoComponent,
+    RecapComponent,
+    QuestionsComponent,
     CharacterSheetComponent,
   ],
   templateUrl: './comic-container.component.html',
@@ -65,10 +71,12 @@ export class ComicContainerComponent {
   protected readonly supportLevel = signal<SupportLevel>(DEFAULT_OPTIONS.supportLevel);
   protected readonly feelingLabels = signal(DEFAULT_OPTIONS.feelingLabels);
   protected readonly notes = signal(DEFAULT_OPTIONS.notes);
+  protected readonly questions = signal(DEFAULT_OPTIONS.questions);
   private readonly options = computed<ComicOptions>(() => ({
     supportLevel: this.supportLevel(),
     feelingLabels: this.feelingLabels(),
     notes: this.notes(),
+    questions: this.questions(),
   }));
 
   /** Set between checking the run time and the user's decision, and during the run itself. */
@@ -139,7 +147,7 @@ export class ComicContainerComponent {
   }
 
   /** The toggles change which LLM calls run, so any estimate is out of date. */
-  protected setToggle(toggle: 'feelingLabels' | 'notes', on: boolean): void {
+  protected setToggle(toggle: 'feelingLabels' | 'notes' | 'questions', on: boolean): void {
     this.estimate.set(null);
     this[toggle].set(on);
   }
