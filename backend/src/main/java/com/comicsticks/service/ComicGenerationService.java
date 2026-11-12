@@ -23,6 +23,7 @@ import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.NoteDto;
 import com.comicsticks.dto.PanelDto;
 import com.comicsticks.dto.PlaceDto;
+import com.comicsticks.dto.Species;
 import com.comicsticks.dto.ThingDto;
 import com.comicsticks.exception.ComicGenerationException;
 import com.comicsticks.service.StorySegmenter.Part;
@@ -260,7 +261,13 @@ public class ComicGenerationService implements ComicGenerator {
         try {
             ThingsReply reply = llm.complete(THINGS_PROMPT.formatted(PanelValidator.MAX_THINGS), prompt.toString(),
                     "panel_things", ComicSchema.things(PanelValidator.MAX_THINGS, names), ThingsReply.class);
-            return validator.validThings(reply == null ? null : reply.things(), part.sourceText(), names);
+            List<Species> species = names.stream()
+                    .flatMap(name -> SheetRules.find(sheet.characters(), name).stream())
+                    .map(CharacterDesign::species)
+                    .filter(Objects::nonNull)
+                    .toList();
+            return PanelValidator.withoutCharacterAnimals(
+                    validator.validThings(reply == null ? null : reply.things(), part.sourceText(), names), species);
         } catch (ComicGenerationException e) {
             log.warn("Skipping objects and animals for a part: {}", e.getMessage());
             return List.of();

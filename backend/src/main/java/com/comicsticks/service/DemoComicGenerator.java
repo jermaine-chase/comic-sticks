@@ -131,7 +131,12 @@ public class DemoComicGenerator implements ComicGenerator {
                 boolean last = g == groups.size() - 1;
                 List<NoteDto> notes = last && options.notes() ? notes(part.sourceText()) : List.of();
                 PanelDto panel = buildPanel(text, panels.size(), cast, options);
-                List<ThingDto> things = options.things() ? things(text, cast) : List.of();
+                List<ThingDto> things = options.things()
+                        ? PanelValidator.withoutCharacterAnimals(things(text, cast), cast.stream()
+                                .flatMap(name -> SheetRules.find(sheet.characters(), name).stream())
+                                .map(CharacterDesign::species)
+                                .toList())
+                        : List.of();
                 panels.add(new PanelDto(panel.panelNumber(), panel.scene(), panel.caption(), panel.characters(),
                         panel.dialogue(), last ? part.sourceText() : "", notes, place, things));
             }

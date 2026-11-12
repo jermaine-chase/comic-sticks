@@ -21,6 +21,8 @@ import com.comicsticks.dto.Hair;
 import com.comicsticks.dto.Hat;
 import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.Snout;
+import com.comicsticks.dto.Species;
+import com.comicsticks.dto.Stance;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
@@ -49,6 +51,11 @@ public class LlmCharacterFinder implements CharacterFinder {
             - description: one short, plain line saying who they are, such as
               "Mole: a shy, kind animal who lives underground".
             - kind: "animal" for an animal character, even one who talks; otherwise "person".
+            - species: for an animal, which animal it is. Use "none" for a person, or for an animal
+              that is not in the list.
+            - stance: "four_legs" for an animal that walks and acts like a real animal, "upright"
+              for one that walks on two legs, talks and acts like a person (wears clothes, lives in
+              a house). Always "upright" for a person.
             - hat, hair, accessory: pick one or two that help tell this character apart, using what
               the story says when it says anything (a top hat, glasses, a cape...). Set the rest to
               "none". Give different characters different looks.
@@ -112,8 +119,7 @@ public class LlmCharacterFinder implements CharacterFinder {
         if (reply != null && reply.characters() != null) {
             reply.characters().stream()
                     .filter(c -> c != null && c.name() != null)
-                    .map(c -> new CharacterDesign(c.name(), c.description(), c.kind(), null, c.hat(), c.hair(),
-                            c.accessory(), c.ears(), c.tail(), c.snout(), false))
+                    .map(LlmCharacterFinder::design)
                     .forEach(characters::add);
         }
         if (reply != null && reply.places() != null) {
@@ -122,11 +128,24 @@ public class LlmCharacterFinder implements CharacterFinder {
         return new CharacterSheet(characters, places);
     }
 
+    /**
+     * An animal of a known species is drawn with that species' ears, tail and snout, so every cat
+     * looks like a cat; the parts the model chose are kept only for other animals.
+     */
+    static CharacterDesign design(FoundCharacter c) {
+        boolean known = c.kind() == CharacterKind.ANIMAL && c.species() != null && c.species() != Species.NONE;
+        return new CharacterDesign(c.name(), c.description(), c.kind(), null, c.hat(), c.hair(), c.accessory(),
+                known ? null : c.ears(), known ? null : c.tail(), known ? null : c.snout(), false, c.species(),
+                c.stance());
+    }
+
     static Map<String, Object> schema() {
         Map<String, Object> character = ComicSchema.object(
                 "name", ComicSchema.string(),
                 "description", ComicSchema.string(),
                 "kind", ComicSchema.enumOf(CharacterKind.values()),
+                "species", ComicSchema.enumOf(Species.values()),
+                "stance", ComicSchema.enumOf(Stance.values()),
                 "hat", ComicSchema.enumOf(Hat.values()),
                 "hair", ComicSchema.enumOf(Hair.values()),
                 "accessory", ComicSchema.enumOf(Accessory.values()),
@@ -147,7 +166,7 @@ public class LlmCharacterFinder implements CharacterFinder {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record FoundCharacter(String name, String description, CharacterKind kind, Hat hat, Hair hair,
-            Accessory accessory, Ears ears, AnimalTail tail, Snout snout) {
+    record FoundCharacter(String name, String description, CharacterKind kind, Species species, Stance stance,
+            Hat hat, Hair hair, Accessory accessory, Ears ears, AnimalTail tail, Snout snout) {
     }
 }

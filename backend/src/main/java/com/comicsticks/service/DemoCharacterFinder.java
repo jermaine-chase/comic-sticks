@@ -23,10 +23,12 @@ import com.comicsticks.dto.Hair;
 import com.comicsticks.dto.Hat;
 import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.Snout;
+import com.comicsticks.dto.Species;
 
 /**
  * The demo profile's character pass, by simple rules: capitalized words used at least twice (or
- * before "said") are characters, animal names make animals, designs are handed out in turn, and
+ * before "said") are characters, animal names make animals of that species (other parts are handed
+ * out in turn), people get designs handed out in turn, and
  * place words such as "river" or "burrow" become places.
  */
 @Service
@@ -87,11 +89,14 @@ public class DemoCharacterFinder implements CharacterFinder {
         List<CharacterDesign> characters = new ArrayList<>();
         for (String name : names(storyText)) {
             int i = characters.size();
-            boolean animal = ANIMAL.matcher(name).matches() || nearbyAnimal(storyText, name);
-            characters.add(animal
+            String animalWord = ANIMAL.matcher(name).matches() ? name : nearbyAnimal(storyText, name);
+            Species species = Species.fromWord(animalWord);
+            boolean known = species != Species.NONE;
+            characters.add(animalWord != null
                     ? new CharacterDesign(name, name + ": an animal in the story.", CharacterKind.ANIMAL, null,
                             HATS[i % HATS.length], Hair.NONE, ACCESSORIES[i % ACCESSORIES.length],
-                            EARS[i % EARS.length], TAILS[i % TAILS.length], i % 2 == 0 ? Snout.SHORT : Snout.LONG, false)
+                            known ? null : EARS[i % EARS.length], known ? null : TAILS[i % TAILS.length],
+                            known ? null : i % 2 == 0 ? Snout.SHORT : Snout.LONG, false, species, null)
                     : new CharacterDesign(name, name + ": a person in the story.", CharacterKind.PERSON, null,
                             HATS[i % HATS.length], HAIR[i % HAIR.length], ACCESSORIES[i % ACCESSORIES.length],
                             Ears.NONE, AnimalTail.NONE, Snout.NONE, false));
@@ -129,16 +134,19 @@ public class DemoCharacterFinder implements CharacterFinder {
         return names.isEmpty() ? List.of("Hero") : names;
     }
 
-    /** "the Mole", "Ratty the rat": an animal word right next to the name. */
-    private static boolean nearbyAnimal(String text, String name) {
-        Matcher m = Pattern.compile("(?i)\\b(\\w+) " + Pattern.quote(name) + "\\b|\\b" + Pattern.quote(name)
-                + "(?:,)? the (\\w+)").matcher(text);
-        while (m.find()) {
-            String word = (m.group(1) != null ? m.group(1) : m.group(2)).toLowerCase(Locale.ROOT);
-            if (ANIMAL.matcher(word).matches()) {
-                return true;
+    /** "the Mole", "Ratty the rat": the animal word right next to the name, or null when there is none. */
+    private static String nearbyAnimal(String text, String name) {
+        // Two separate searches: in "ran to Tom the cat", "to Tom" must not hide "Tom the cat".
+        for (String regex : List.of("(?i)\\b(\\w+) " + Pattern.quote(name) + "\\b",
+                "(?i)\\b" + Pattern.quote(name) + ",? the (\\w+)")) {
+            Matcher m = Pattern.compile(regex).matcher(text);
+            while (m.find()) {
+                String word = m.group(1).toLowerCase(Locale.ROOT);
+                if (ANIMAL.matcher(word).matches()) {
+                    return word;
+                }
             }
         }
-        return false;
+        return null;
     }
 }

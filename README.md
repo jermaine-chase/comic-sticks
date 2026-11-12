@@ -71,8 +71,18 @@ timeout and upload limits, the run time estimate (`comic.llm.seconds-*`), the su
 2. `POST /api/comics/characters` runs the character pass: the story is read in chunks of
    `comic.characters.chunk-chars`, one small call each, to find the main characters and places.
    Each character gets a fixed design (person or animal, 1 to 2 of hat, hair and accessory, and
-   ears, tail and snout for animals) and each place a background preset. The UI shows this
-   character sheet for review and editing.
+   for animals a `species`, a `stance` and ears, tail and snout) and each place a background
+   preset. The UI shows this character sheet for review and editing.
+
+   An animal's `species` (cat, dog, horse, hedgehog, owl... see `Species`) brings its own ears,
+   tail, snout and stance, so every cat looks like a cat: the character pass uses the species'
+   parts, and `SheetRules` fills in any parts or stance a sheet leaves out. The frontend tints the
+   head, ears and snout in the species' colour and adds one telling mark (a lion's mane, a sheep's
+   wool, a hedgehog's spines, a bird's wing, a frog's eye bumps...). `stance` is `upright` (walks
+   and talks like a person) or `four_legs` (a level body on four legs, drawn from
+   `FOUR_LEGGED_SKELETONS`, where poses that use the arms lift a front paw). People are always
+   upright and have no species. The sheet editor sets an animal's parts and stance when its
+   species is chosen, and each can then be changed.
 3. `POST /api/comics/generate` sends the story to the LLM one part at a time, in order, and joins
    the panels. Every part is given the sheet, and every figure is drawn from it by name, so a
    character looks the same in every panel. Anyone a panel names who is not on the sheet gets a
@@ -222,7 +232,8 @@ A generate response:
     {
       "name": "Mia", "description": "Mia: a curious girl who loves maps.", "kind": "person",
       "color": "#1b1b1f", "hat": "none", "hair": "ponytail", "accessory": "glasses",
-      "ears": "none", "tail": "none", "snout": "none", "added": false
+      "ears": "none", "tail": "none", "snout": "none", "added": false,
+      "species": "none", "stance": "upright"
     }
   ],
   "places": [{ "name": "The attic", "description": "A dusty room at the top of the house.", "background": "room" }],
@@ -256,6 +267,8 @@ drawing. The LLM schemas are built from the Java enums, so they pick up the chan
 | Poses, expressions                                                    | `Pose`, `Expression`              | `stick-figure.poses.ts`         |
 | Dialogue types                                                        | `DialogueType`                    | `comic-panel.component.css`     |
 | Hats, hair, accessories, ears, tails, snouts                          | `Hat`, `Hair`, `Accessory`, `Ears`, `AnimalTail`, `Snout` | `stick-figure.features.ts` |
+| Species (with its default parts and stance on the Java value and in `SPECIES_DEFAULTS`) | `Species` | `SPECIES_SKIN` and `speciesMarks` in `stick-figure.features.ts` |
+| Four-legged poses (every pose needs one)                              | `Pose`                            | `FOUR_LEGGED_SKELETONS` in `stick-figure.poses.ts` |
 | Place backgrounds                                                     | `Background`                      | `panel-background.component.ts` |
 | Objects and background animals (list its words on the Java value too) | `Thing`                           | `things.drawings.ts`            |
 

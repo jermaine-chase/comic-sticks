@@ -232,7 +232,76 @@ export interface CharacterDesign {
   snout: Snout;
   /** Not on the reviewed sheet: a panel named them, so they got a plain default design. */
   added: boolean;
+  /** What kind of animal, or "none". Absent on sheets made before species existed. */
+  species?: Species;
+  /** Upright like a person, or on four legs. Absent on older sheets, which means upright. */
+  stance?: Stance;
 }
+
+export const STANCES = ['upright', 'four_legs'] as const;
+export type Stance = (typeof STANCES)[number];
+
+/** Matches the Java enum Species, including each species' default parts and stance. */
+export const SPECIES = [
+  'none',
+  'cat',
+  'dog',
+  'wolf',
+  'fox',
+  'rabbit',
+  'mouse',
+  'rat',
+  'mole',
+  'badger',
+  'squirrel',
+  'hedgehog',
+  'bear',
+  'lion',
+  'pig',
+  'horse',
+  'cow',
+  'sheep',
+  'frog',
+  'toad',
+  'bird',
+  'owl',
+  'duck',
+] as const;
+export type Species = (typeof SPECIES)[number];
+
+type SpeciesDefaults = { ears: Ears; tail: AnimalTail; snout: Snout; stance: Stance };
+const parts = (ears: Ears, tail: AnimalTail, snout: Snout, stance: Stance): SpeciesDefaults => ({
+  ears,
+  tail,
+  snout,
+  stance,
+});
+
+export const SPECIES_DEFAULTS: Record<Species, SpeciesDefaults> = {
+  none: parts('none', 'none', 'none', 'upright'),
+  cat: parts('pointy', 'long', 'short', 'four_legs'),
+  dog: parts('floppy', 'short', 'short', 'four_legs'),
+  wolf: parts('pointy', 'bushy', 'long', 'four_legs'),
+  fox: parts('pointy', 'bushy', 'long', 'four_legs'),
+  rabbit: parts('long', 'short', 'short', 'upright'),
+  mouse: parts('round', 'long', 'short', 'upright'),
+  rat: parts('round', 'long', 'long', 'upright'),
+  mole: parts('none', 'short', 'long', 'upright'),
+  badger: parts('round', 'short', 'long', 'upright'),
+  squirrel: parts('pointy', 'bushy', 'short', 'upright'),
+  hedgehog: parts('round', 'none', 'long', 'upright'),
+  bear: parts('round', 'short', 'short', 'four_legs'),
+  lion: parts('round', 'long', 'short', 'four_legs'),
+  pig: parts('floppy', 'curly', 'short', 'four_legs'),
+  horse: parts('pointy', 'long', 'long', 'four_legs'),
+  cow: parts('floppy', 'long', 'short', 'four_legs'),
+  sheep: parts('floppy', 'short', 'short', 'four_legs'),
+  frog: parts('none', 'none', 'none', 'upright'),
+  toad: parts('none', 'none', 'none', 'upright'),
+  bird: parts('none', 'short', 'beak', 'upright'),
+  owl: parts('pointy', 'short', 'beak', 'upright'),
+  duck: parts('none', 'short', 'beak', 'upright'),
+};
 
 export interface Place {
   name: string;

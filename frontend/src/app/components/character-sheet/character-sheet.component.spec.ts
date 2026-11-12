@@ -75,6 +75,21 @@ describe('CharacterSheetComponent', () => {
     expect(emitted[1].characters[1].added).toBe(false);
   });
 
+  it('gives a chosen animal its own parts and stance, which can then be changed', () => {
+    change('select[name="species"]', 'horse');
+    change('select[name="stance"]', 'upright');
+
+    expect(emitted[0].characters[0]).toMatchObject({
+      species: 'horse',
+      ears: 'pointy',
+      tail: 'long',
+      snout: 'long',
+      stance: 'four_legs',
+    });
+    expect(emitted[1].characters[0].stance).toBe('upright');
+    expect(root.querySelector('select[name="species"]')).toBeTruthy();
+  });
+
   it('adds and removes characters and places', () => {
     (root.querySelector('button[aria-label="Remove Mole"]') as HTMLButtonElement).click();
     Array.from(root.querySelectorAll('button'))

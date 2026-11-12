@@ -2,13 +2,13 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, Input } from '@angular/core';
 import { CharacterDesign, Expression, Facing, Pose, Thing } from '../../models/comic.models';
 import { THING_ART } from '../things/things.drawings';
-import { FeatureLayers, featureLayers, Shape } from './stick-figure.features';
+import { FeatureLayers, featureLayers, headFill, Shape } from './stick-figure.features';
 import {
   EYE_PATHS,
   Face,
   FACES,
   OPEN_MOUTH,
-  SKELETONS,
+  skeletonFor,
   Skeleton,
   SWEAT_PATH,
   TEAR_PATH,
@@ -68,7 +68,7 @@ const FACE_INK = '#1b1b1f';
           <g class="features-head-back">
             <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.headBack }" />
           </g>
-          <circle r="20" fill="#fffdf6" />
+          <circle r="20" [attr.fill]="skin" />
           <g class="face" [attr.stroke]="faceInk" stroke-width="2.5">
             @if (face.blush) {
               <ellipse cx="-11" cy="5" rx="4.5" ry="2.5" fill="#f4a3b4" stroke="none" />
@@ -225,12 +225,17 @@ export class StickFigureComponent {
     return featureLayers(this.design, this.skeleton);
   }
 
+  /** The inside of the head: plain skin, or an animal's fur colour. */
+  protected get skin(): string {
+    return headFill(this.design);
+  }
+
   protected readonly faceInk = FACE_INK;
   protected readonly tearPath = TEAR_PATH;
   protected readonly sweatPath = SWEAT_PATH;
 
   protected get skeleton(): Skeleton {
-    return SKELETONS[this.pose] ?? SKELETONS.standing;
+    return skeletonFor(this.pose, this.design?.kind === 'animal' ? this.design.stance : 'upright');
   }
 
   protected get face(): Face {

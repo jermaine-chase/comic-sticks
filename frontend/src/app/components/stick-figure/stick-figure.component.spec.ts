@@ -8,11 +8,13 @@ import {
   HATS,
   POSES,
   SNOUTS,
+  SPECIES,
+  SPECIES_DEFAULTS,
   TAILS,
 } from '../../models/comic.models';
-import { featureLayers } from './stick-figure.features';
+import { featureLayers, SPECIES_SKIN } from './stick-figure.features';
 import { StickFigureComponent } from './stick-figure.component';
-import { FACES, SKELETONS } from './stick-figure.poses';
+import { FACES, FOUR_LEGGED_SKELETONS, skeletonFor, SKELETONS } from './stick-figure.poses';
 
 describe('StickFigureComponent', () => {
   function render(inputs: Record<string, unknown>) {
@@ -21,6 +23,58 @@ describe('StickFigureComponent', () => {
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
+
+  describe('animals', () => {
+    const DOG: CharacterDesign = {
+      name: 'Rex',
+      description: '',
+      kind: 'animal',
+      color: '#1b1b1f',
+      hat: 'none',
+      hair: 'none',
+      accessory: 'none',
+      ears: 'floppy',
+      tail: 'short',
+      snout: 'short',
+      added: false,
+      species: 'dog',
+      stance: 'four_legs',
+    };
+    const head = (root: HTMLElement) => root.querySelector('svg > g > g[transform]')!.getAttribute('transform');
+
+    it('has a four-legged drawing for every pose', () => {
+      POSES.forEach((pose) => {
+        const s = FOUR_LEGGED_SKELETONS[pose];
+        expect(s).toBeTruthy();
+        // A level body: the hip is behind the shoulder, not under it.
+        expect(s.shoulder[0] - s.hip[0]).toBeGreaterThan(25);
+      });
+    });
+
+    it('draws an animal on four legs only when its sheet says so', () => {
+      expect(head(render({ design: DOG }))).toBe('translate(98,100)');
+      expect(head(render({ design: { ...DOG, stance: 'upright' } }))).toBe('translate(60,34)');
+      expect(head(render({ design: { ...DOG, kind: 'person' } }))).toBe('translate(60,34)');
+      expect(skeletonFor('waving', 'four_legs').frontArm[1][1]).toBeLessThan(
+        skeletonFor('standing', 'four_legs').frontArm[1][1],
+      );
+    });
+
+    it('colours an animal’s head by its species and adds its telling mark', () => {
+      const lion = render({ design: { ...DOG, species: 'lion' } });
+
+      expect(lion.querySelector('circle[r="20"]')!.getAttribute('fill')).toBe(SPECIES_SKIN.lion);
+      expect(lion.querySelector('[data-feature="species-mane"]')).toBeTruthy();
+      expect(render({}).querySelector('circle[r="20"]')!.getAttribute('fill')).toBe('#fffdf6');
+    });
+
+    it('has a skin and default parts for every species', () => {
+      SPECIES.forEach((species) => {
+        expect(SPECIES_SKIN[species]).toMatch(/^#[0-9a-f]{6}$/);
+        expect(SPECIES_DEFAULTS[species]).toBeTruthy();
+      });
+    });
+  });
 
   it('has a drawing for every pose and expression', () => {
     POSES.forEach((pose) => expect(SKELETONS[pose]).toBeTruthy());

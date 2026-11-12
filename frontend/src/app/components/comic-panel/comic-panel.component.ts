@@ -17,6 +17,7 @@ import {
   Panel,
   Place,
   POSES,
+  Stance,
 } from '../../models/comic.models';
 import { PanelBackgroundComponent } from './panel-background.component';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
@@ -157,6 +158,12 @@ export class ComicPanelComponent {
     document.fonts?.ready.then(() => this.size.update((n) => n + 1));
   }
 
+  /** How a character stands, from the sheet. Only animals stand on four legs. */
+  private stanceOf(name: string): Stance {
+    const design = this.designByName().get(name);
+    return design?.kind === 'animal' && design.stance === 'four_legs' ? 'four_legs' : 'upright';
+  }
+
   protected bubbleLabel(speaker: string, type: string): string {
     const verb = { speech: 'says', shout: 'shouts', whisper: 'whispers', thought: 'thinks' }[type];
     return `${speaker} ${verb ?? 'says'}`;
@@ -201,7 +208,7 @@ export class ComicPanelComponent {
       }
       const figure = local(figureEl.getBoundingClientRect());
       const character = panel.characters[speaker];
-      const head = headCenter(figure, character.pose, facing[speaker]);
+      const head = headCenter(figure, character.pose, facing[speaker], this.stanceOf(character.name));
       const radius = HEAD_RADIUS * ((figure.right - figure.left) / FIGURE_CANVAS.width);
       tails.push({ type: line.type, ...tailTo(bubble, head, radius, line.type === 'thought') });
     });

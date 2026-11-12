@@ -1,4 +1,4 @@
-import { Expression, Pose } from '../../models/comic.models';
+import { Expression, Pose, Stance } from '../../models/comic.models';
 
 type Point = readonly [x: number, y: number];
 
@@ -233,6 +233,199 @@ export const SKELETONS: Record<Pose, Skeleton> = {
     ],
   },
 };
+
+/**
+ * An animal on four legs, facing right: a level body from the hip (rear) to the shoulder (front),
+ * with the head at the front. The "arms" are the front legs and the "legs" the back legs, so the
+ * face, the features and the bubble tails work the same as for an upright figure. Poses that use
+ * the arms (waving, pointing, cheering, fighting) lift a front paw.
+ */
+const QUAD = { head: [98, 100], shoulder: [80, 126], hip: [32, 128] } as const;
+const QUAD_FRONT_LEGS = {
+  backArm: [
+    [78, 154],
+    [76, 180],
+  ],
+  frontArm: [
+    [86, 154],
+    [88, 180],
+  ],
+} as const;
+const QUAD_BACK_LEGS = {
+  backLeg: [
+    [30, 154],
+    [28, 180],
+  ],
+  frontLeg: [
+    [38, 154],
+    [40, 180],
+  ],
+} as const;
+const PAW_UP = {
+  frontArm: [
+    [96, 114],
+    [110, 100],
+  ],
+} as const;
+
+export const FOUR_LEGGED_SKELETONS: Record<Pose, Skeleton> = {
+  standing: { ...QUAD, ...QUAD_FRONT_LEGS, ...QUAD_BACK_LEGS },
+  walking: {
+    ...QUAD,
+    head: [100, 102],
+    backArm: [
+      [74, 154],
+      [68, 180],
+    ],
+    frontArm: [
+      [88, 154],
+      [96, 180],
+    ],
+    backLeg: [
+      [26, 154],
+      [18, 180],
+    ],
+    frontLeg: [
+      [40, 154],
+      [46, 180],
+    ],
+  },
+  running: {
+    head: [102, 94],
+    shoulder: [82, 120],
+    hip: [30, 124],
+    backArm: [
+      [94, 140],
+      [110, 148],
+    ],
+    frontArm: [
+      [96, 146],
+      [112, 160],
+    ],
+    backLeg: [
+      [18, 140],
+      [4, 152],
+    ],
+    frontLeg: [
+      [26, 146],
+      [16, 164],
+    ],
+    airborne: true,
+  },
+  waving: { ...QUAD, ...QUAD_FRONT_LEGS, ...QUAD_BACK_LEGS, ...PAW_UP },
+  shouting: { ...QUAD, ...QUAD_FRONT_LEGS, ...QUAD_BACK_LEGS, head: [100, 96], openMouth: true },
+  pointing: {
+    ...QUAD,
+    ...QUAD_FRONT_LEGS,
+    ...QUAD_BACK_LEGS,
+    frontArm: [
+      [98, 130],
+      [114, 128],
+    ],
+  },
+  thinking: {
+    ...QUAD,
+    ...QUAD_FRONT_LEGS,
+    ...QUAD_BACK_LEGS,
+    head: [96, 102],
+    frontArm: [
+      [92, 130],
+      [100, 120],
+    ],
+  },
+  sitting: {
+    head: [90, 96],
+    shoulder: [74, 124],
+    hip: [40, 162],
+    backArm: [
+      [72, 154],
+      [72, 180],
+    ],
+    frontArm: [
+      [80, 154],
+      [82, 180],
+    ],
+    backLeg: [
+      [56, 168],
+      [66, 180],
+    ],
+    frontLeg: [
+      [58, 172],
+      [70, 180],
+    ],
+  },
+  jumping: {
+    head: [100, 72],
+    shoulder: [80, 98],
+    hip: [32, 104],
+    backArm: [
+      [86, 116],
+      [96, 124],
+    ],
+    frontArm: [
+      [92, 114],
+      [104, 120],
+    ],
+    backLeg: [
+      [22, 120],
+      [30, 132],
+    ],
+    frontLeg: [
+      [30, 122],
+      [40, 134],
+    ],
+    airborne: true,
+  },
+  cheering: { ...QUAD, ...QUAD_FRONT_LEGS, ...QUAD_BACK_LEGS, ...PAW_UP, head: [100, 94] },
+  fighting: {
+    head: [96, 108],
+    shoulder: [78, 130],
+    hip: [32, 124],
+    backArm: [
+      [80, 156],
+      [74, 180],
+    ],
+    frontArm: [
+      [98, 118],
+      [112, 110],
+    ],
+    backLeg: [
+      [24, 152],
+      [14, 180],
+    ],
+    frontLeg: [
+      [40, 152],
+      [46, 180],
+    ],
+  },
+  falling: {
+    head: [100, 164],
+    shoulder: [80, 158],
+    hip: [36, 150],
+    backArm: [
+      [76, 140],
+      [72, 120],
+    ],
+    frontArm: [
+      [86, 140],
+      [90, 118],
+    ],
+    backLeg: [
+      [26, 132],
+      [30, 112],
+    ],
+    frontLeg: [
+      [40, 132],
+      [48, 114],
+    ],
+  },
+};
+
+/** The skeleton for a pose: an upright figure's, or a four-legged animal's. */
+export function skeletonFor(pose: Pose, stance: Stance | undefined): Skeleton {
+  const set = stance === 'four_legs' ? FOUR_LEGGED_SKELETONS : SKELETONS;
+  return set[pose] ?? set.standing;
+}
 
 /**
  * Face drawn around the head's centre at (0, 0), shifted towards the facing side. Faces are

@@ -1,6 +1,7 @@
 package com.comicsticks.service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -12,6 +13,8 @@ import com.comicsticks.dto.DialogueDto;
 import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.NoteDto;
 import com.comicsticks.dto.PanelDto;
+import com.comicsticks.dto.Species;
+import com.comicsticks.dto.Thing;
 import com.comicsticks.dto.ThingDto;
 
 /**
@@ -102,6 +105,17 @@ public class PanelValidator {
             }
         }
         return kept;
+    }
+
+    /**
+     * Drops background animals of a species that an animal character in the panel already is, as
+     * "the dog" in a passage about Rex the dog: the text means the character, not another dog.
+     */
+    public static List<ThingDto> withoutCharacterAnimals(List<ThingDto> things, Collection<Species> species) {
+        return things.stream()
+                .filter(t -> t.thing().kind() != Thing.Kind.ANIMAL
+                        || !species.contains(Species.fromWord(t.thing().name())))
+                .toList();
     }
 
     static boolean isValid(DialogueDto line, String text) {

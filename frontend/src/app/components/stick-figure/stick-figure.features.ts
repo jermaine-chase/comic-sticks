@@ -1,4 +1,4 @@
-import { CharacterDesign } from '../../models/comic.models';
+import { CharacterDesign, Species } from '../../models/comic.models';
 import { Skeleton } from './stick-figure.poses';
 
 /**
@@ -83,12 +83,108 @@ const rect = (
 
 const HAIR_CAP = 'M-20,-2 C-22,-20 -8,-26 2,-24 C14,-24 21,-16 20,-4 C14,-14 -10,-16 -20,-2 Z';
 
+/**
+ * Each species' fur or skin, a light tint so the face's dark lines stay easy to read. The head,
+ * ears and snout are filled with it, which is what tells a fox from a mouse at a glance.
+ */
+export const SPECIES_SKIN: Record<Species, string> = {
+  none: SKIN,
+  cat: '#f6d7a8',
+  dog: '#ead3b2',
+  wolf: '#d5d8dc',
+  fox: '#f6b27c',
+  rabbit: '#efe9e2',
+  mouse: '#dcdce2',
+  rat: '#d2cbc3',
+  mole: '#c9bdb5',
+  badger: '#f2f2f2',
+  squirrel: '#ecae74',
+  hedgehog: '#efdcbf',
+  bear: '#d2ab82',
+  lion: '#f4d68e',
+  pig: '#f8c9d2',
+  horse: '#dcb790',
+  cow: '#fafafa',
+  sheep: '#f7f3ea',
+  frog: '#bfe3a1',
+  toad: '#cdc78f',
+  bird: '#cfe3f7',
+  owl: '#dcbb93',
+  duck: '#fbfbf3',
+};
+
+/** The colour inside a character's head. People and animals of no known species keep plain skin. */
+export function headFill(design: CharacterDesign | null): string {
+  return design?.kind === 'animal' ? SPECIES_SKIN[design.species ?? 'none'] ?? SKIN : SKIN;
+}
+
+/** One telling mark for species whose ears, tail and snout are not enough on their own. */
+function speciesMarks(species: Species, layers: FeatureLayers, skeleton: Skeleton, color: string): void {
+  const [sx, sy] = skeleton.shoulder;
+  const whiskers = path('species-whiskers', 'M16,4 L34,-1 M16,7 L34,8 M16,10 L32,16', 'none', INK, 1.5);
+  switch (species) {
+    case 'cat':
+    case 'mouse':
+    case 'rat':
+    case 'rabbit':
+      layers.headFront.push(whiskers);
+      break;
+    case 'lion':
+      layers.headBack.push(circle('species-mane', 0, 0, 31, '#c98a2c', color));
+      break;
+    case 'horse':
+      layers.headBack.push(path('species-mane', 'M-6,-22 C-26,-18 -30,8 -22,26 L-12,10 Z', '#7a5230', color));
+      break;
+    case 'sheep':
+      for (const [cx, cy] of [
+        [-16, -14],
+        [-6, -22],
+        [6, -22],
+        [16, -14],
+        [-20, -2],
+      ]) {
+        layers.headBack.push(circle('species-wool', cx, cy, 9, '#f7f3ea', color));
+      }
+      break;
+    case 'hedgehog':
+      layers.headBack.push(
+        path(
+          'species-spines',
+          'M-8,-19 L-14,-34 L-14,-17 L-26,-26 L-20,-9 L-34,-12 L-21,-1 L-33,6 L-18,8 Z',
+          '#8a6a4a',
+          color,
+        ),
+      );
+      break;
+    case 'badger':
+      layers.headFront.push(path('species-stripe', 'M-6,-19 Q0,-21 6,-19 L3,-9 L-3,-9 Z', '#3b3b44', INK, 1));
+      break;
+    case 'cow':
+      layers.headBack.push(path('species-horns', 'M-12,-15 Q-18,-28 -10,-30 M10,-16 Q16,-28 8,-31', 'none', color, 3));
+      break;
+    case 'frog':
+    case 'toad':
+      layers.headBack.push(circle('species-eye-bumps', -8, -17, 8, SPECIES_SKIN[species], color));
+      layers.headBack.push(circle('species-eye-bumps', 9, -17, 8, SPECIES_SKIN[species], color));
+      break;
+    case 'bird':
+    case 'owl':
+    case 'duck':
+      layers.back.push(ellipse('species-wing', sx - 10, sy + 22, 10, 22, SPECIES_SKIN[species], color));
+      break;
+  }
+}
+
 export function featureLayers(design: CharacterDesign | null, skeleton: Skeleton): FeatureLayers {
   const layers: FeatureLayers = { back: [], headBack: [], headFront: [], front: [] };
   if (!design) {
     return layers;
   }
   const color = design.color || INK;
+  const skin = headFill(design);
+  if (design.kind === 'animal' && design.species && design.species !== 'none') {
+    speciesMarks(design.species, layers, skeleton, color);
+  }
   const [sx, sy] = skeleton.shoulder;
   const [hx, hy] = skeleton.hip;
 
@@ -132,24 +228,24 @@ export function featureLayers(design: CharacterDesign | null, skeleton: Skeleton
 
   switch (design.ears) {
     case 'round':
-      layers.headBack.push(circle('ears-round', -12, -18, 8, SKIN, color));
-      layers.headBack.push(circle('ears-round', 9, -19, 8, SKIN, color));
+      layers.headBack.push(circle('ears-round', -12, -18, 8, skin, color));
+      layers.headBack.push(circle('ears-round', 9, -19, 8, skin, color));
       break;
     case 'pointy':
       layers.headBack.push(
-        path('ears-pointy', 'M-17,-10 L-15,-36 L-3,-18 Z M3,-18 L14,-36 L17,-10 Z', SKIN, color),
+        path('ears-pointy', 'M-17,-10 L-15,-36 L-3,-18 Z M3,-18 L14,-36 L17,-10 Z', skin, color),
       );
       break;
     case 'long':
-      layers.headBack.push(ellipse('ears-long', -8, -36, 5, 17, SKIN, color));
-      layers.headBack.push(ellipse('ears-long', 7, -36, 5, 17, SKIN, color));
+      layers.headBack.push(ellipse('ears-long', -8, -36, 5, 17, skin, color));
+      layers.headBack.push(ellipse('ears-long', 7, -36, 5, 17, skin, color));
       break;
     case 'floppy':
       layers.headFront.push(
         path(
           'ears-floppy',
           'M-14,-14 C-32,-12 -32,14 -22,18 C-18,8 -16,0 -12,-8 Z M12,-16 C28,-14 28,10 20,14 C16,6 14,-2 10,-10 Z',
-          SKIN,
+          skin,
           color,
         ),
       );
@@ -198,11 +294,11 @@ export function featureLayers(design: CharacterDesign | null, skeleton: Skeleton
 
   switch (design.snout) {
     case 'short':
-      layers.headFront.push(ellipse('snout-short', 19, 5, 8, 6, SKIN, color));
+      layers.headFront.push(ellipse('snout-short', 19, 5, 8, 6, skin, color));
       layers.headFront.push(circle('snout-nose', 26, 3, 2.8, INK, INK));
       break;
     case 'long':
-      layers.headFront.push(ellipse('snout-long', 25, 6, 13, 6, SKIN, color));
+      layers.headFront.push(ellipse('snout-long', 25, 6, 13, 6, skin, color));
       layers.headFront.push(circle('snout-nose', 37, 5, 3.2, INK, INK));
       break;
     case 'beak':
@@ -231,7 +327,7 @@ export function featureLayers(design: CharacterDesign | null, skeleton: Skeleton
       );
       break;
     case 'short':
-      layers.back.push(circle('tail-short', hx - 15, hy - 4, 6, SKIN, color));
+      layers.back.push(circle('tail-short', hx - 15, hy - 4, 6, skin, color));
       break;
   }
 

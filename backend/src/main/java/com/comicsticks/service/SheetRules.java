@@ -26,13 +26,16 @@ import com.comicsticks.dto.PanelDto;
 import com.comicsticks.dto.ThingDto;
 import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.Snout;
+import com.comicsticks.dto.Species;
+import com.comicsticks.dto.Stance;
 
 /**
  * Keeps a character sheet usable and keeps panels faithful to it:
  *
  * <ul>
  * <li>names are unique, each character has a colour, a person has no animal parts, an animal has
- * ears or a snout, and at most two of hat, hair and accessory are set, so designs stay simple;
+ * ears or a snout unless its species has neither, a species fills in the parts and stance left out,
+ * and at most two of hat, hair and accessory are set, so designs stay simple;
  * <li>panels use the sheet's spelling of each name and place, and a character a panel names who is
  * not on the sheet gets a plain default design, marked as added.
  * </ul>
@@ -89,14 +92,25 @@ public class SheetRules {
         Ears ears = or(d.ears(), Ears.NONE);
         AnimalTail tail = or(d.tail(), AnimalTail.NONE);
         Snout snout = or(d.snout(), Snout.NONE);
+        Species species = or(d.species(), Species.NONE);
+        Stance stance;
 
         if (kind == CharacterKind.PERSON) {
             ears = Ears.NONE;
             tail = AnimalTail.NONE;
             snout = Snout.NONE;
-        } else if (ears == Ears.NONE && snout == Snout.NONE) {
-            ears = Ears.ROUND;
-            snout = Snout.SHORT;
+            species = Species.NONE;
+            stance = Stance.UPRIGHT;
+        } else {
+            // A species brings its own parts, so only missing ones are filled from it.
+            ears = d.ears() == null ? species.ears() : ears;
+            tail = d.tail() == null ? species.tail() : tail;
+            snout = d.snout() == null ? species.snout() : snout;
+            stance = or(d.stance(), species.stance());
+            if (species == Species.NONE && ears == Ears.NONE && snout == Snout.NONE) {
+                ears = Ears.ROUND;
+                snout = Snout.SHORT;
+            }
         }
         // Keep the two most telling features: what is worn or carried, then a hat, then hair.
         int features = 0;
@@ -115,7 +129,7 @@ public class SheetRules {
         String color = d.color() != null && HEX_COLOR.matcher(d.color()).matches() ? d.color()
                 : PALETTE.get(index % PALETTE.size());
         return new CharacterDesign(text(d.name()), oneLine(d.description()), kind, color, hat, hair, accessory,
-                ears, tail, snout, d.added());
+                ears, tail, snout, d.added(), species, stance);
     }
 
     /** A plain design for a character a panel names who is not on the sheet. */

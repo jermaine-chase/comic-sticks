@@ -12,6 +12,8 @@ package com.comicsticks.dto;
  * @param ears        animal parts, set only for animals
  * @param added       true (never null) when the character was not on the reviewed sheet but appeared in a panel,
  *                    so it got a plain default design that the user may want to check
+ * @param species     what kind of animal, or {@code none}; always {@code none} for a person
+ * @param stance      upright like a person, or on four legs like a real animal; always upright for a person
  */
 public record CharacterDesign(
         String name,
@@ -24,9 +26,17 @@ public record CharacterDesign(
         Ears ears,
         AnimalTail tail,
         Snout snout,
-        Boolean added) {
+        Boolean added,
+        Species species,
+        Stance stance) {
 
     public CharacterDesign {
         added = Boolean.TRUE.equals(added);
+    }
+
+    /** A design with no species, standing upright unless normalized otherwise. */
+    public CharacterDesign(String name, String description, CharacterKind kind, String color, Hat hat, Hair hair,
+            Accessory accessory, Ears ears, AnimalTail tail, Snout snout, Boolean added) {
+        this(name, description, kind, color, hat, hair, accessory, ears, tail, snout, added, null, null);
     }
 }

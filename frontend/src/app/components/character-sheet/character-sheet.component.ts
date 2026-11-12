@@ -11,6 +11,9 @@ import {
   label,
   Place,
   SNOUTS,
+  SPECIES,
+  SPECIES_DEFAULTS,
+  STANCES,
   TAILS,
 } from '../../models/comic.models';
 import { PanelBackgroundComponent } from '../comic-panel/panel-background.component';
@@ -54,6 +57,8 @@ export class CharacterSheetComponent {
   protected readonly tails = TAILS;
   protected readonly snouts = SNOUTS;
   protected readonly backgrounds = BACKGROUNDS;
+  protected readonly species = SPECIES;
+  protected readonly stances = STANCES;
 
   protected updateCharacter(index: number, change: Partial<CharacterDesign>): void {
     const characters = this.sheet().characters.map((c, i) => {
@@ -63,7 +68,18 @@ export class CharacterSheetComponent {
       const updated = { ...c, ...change, added: false };
       // A person has no animal parts; an animal gets some to start from.
       if (change.kind === 'person') {
-        return { ...updated, ears: 'none', tail: 'none', snout: 'none' } as CharacterDesign;
+        return {
+          ...updated,
+          ears: 'none',
+          tail: 'none',
+          snout: 'none',
+          species: 'none',
+          stance: 'upright',
+        } as CharacterDesign;
+      }
+      // Choosing an animal gives it that animal's parts and stance, which can then be changed.
+      if (change.species && change.species !== 'none') {
+        return { ...updated, ...SPECIES_DEFAULTS[change.species] };
       }
       if (change.kind === 'animal' && updated.ears === 'none' && updated.snout === 'none') {
         return { ...updated, ears: 'round', snout: 'short', tail: 'short' } as CharacterDesign;

@@ -5,9 +5,10 @@ import {
   LARGE_THINGS,
   Panel,
   Pose,
+  Stance,
   Thing,
 } from '../../models/comic.models';
-import { SKELETONS } from '../stick-figure/stick-figure.poses';
+import { skeletonFor } from '../stick-figure/stick-figure.poses';
 import { THING_ART } from '../things/things.drawings';
 
 /**
@@ -132,8 +133,8 @@ export function hasTail(dialogue: Dialogue[], index: number): boolean {
 }
 
 /** The centre of a figure's head, in the coordinates of the rectangle the figure is drawn in. */
-export function headCenter(figure: Rect, pose: Pose, facing: Facing): Point {
-  const [hx, hy] = (SKELETONS[pose] ?? SKELETONS.standing).head;
+export function headCenter(figure: Rect, pose: Pose, facing: Facing, stance?: Stance): Point {
+  const [hx, hy] = skeletonFor(pose, stance).head;
   const x = facing === 'left' ? FIGURE_CANVAS.width - hx : hx;
   const scaleX = (figure.right - figure.left) / FIGURE_CANVAS.width;
   const scaleY = (figure.bottom - figure.top) / FIGURE_CANVAS.height;
