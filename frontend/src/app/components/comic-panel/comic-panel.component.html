@@ -80,7 +80,7 @@
             [appEditable]="character.name"
             (edited)="rename.emit({ from: character.name, to: $event })"
           ></span>
-          @if (character.feeling) {
+          @if (character.feeling && showFeelings()) {
             <span
               class="feeling"
               [attr.aria-label]="character.name + ' feels ' + character.feeling"

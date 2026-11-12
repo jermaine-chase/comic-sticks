@@ -161,6 +161,35 @@
       ></h2>
       <p class="hint">Click any text to edit it. Hover over a figure to change its pose or face.</p>
 
+      <div class="comic-tools">
+        @if (hasFeelings()) {
+          <label class="tool-switch">
+            <input
+              type="checkbox"
+              name="show-feelings"
+              [checked]="showFeelings()"
+              (change)="showFeelings.set($any($event.target).checked)"
+            />
+            Show feeling words
+          </label>
+        }
+        <button
+          #keyButton
+          type="button"
+          class="link-button"
+          aria-haspopup="dialog"
+          (click)="keyOpen.set(true)"
+        >
+          Emotion key: what each face means
+        </button>
+      </div>
+      @if (keyOpen()) {
+        <app-emotion-key
+          [used]="usedExpressions()"
+          (close)="keyOpen.set(false); keyButton.focus()"
+        />
+      }
+
       <div class="comic-grid">
         @if (comic.bookends; as bookends) {
           <app-whos-who
@@ -175,6 +204,7 @@
             [colorOf]="colorFn"
             [designs]="comic.characters"
             [places]="comic.places"
+            [showFeelings]="showFeelings()"
             (captionChange)="setCaption(panelIndex, $event)"
             (dialogueChange)="setDialogue(panelIndex, $event.index, $event.text)"
             (characterChange)="updateCharacter(panelIndex, $event.index, $event.change)"

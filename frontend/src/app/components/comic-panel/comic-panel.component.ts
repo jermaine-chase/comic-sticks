@@ -66,6 +66,8 @@ export class ComicPanelComponent {
   /** The character sheet. Every figure is drawn from its design, looked up by name. */
   readonly designs = input<CharacterDesign[]>([]);
   readonly places = input<Place[]>([]);
+  /** Whether feeling tags are shown. The faces show the feeling either way. */
+  readonly showFeelings = input(true);
 
   protected readonly designByName = computed(
     () => new Map(this.designs().map((d) => [d.name, d] as const)),

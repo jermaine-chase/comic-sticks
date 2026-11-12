@@ -240,6 +240,45 @@ textarea:disabled {
   text-align: center;
 }
 
+/* View settings for the finished comic. These change nothing in the comic itself. */
+.comic-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.6rem;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 1rem;
+  font: 700 1.05rem var(--font-reading, 'Atkinson Hyperlegible', 'Verdana', sans-serif);
+}
+
+.tool-switch {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.tool-switch input {
+  width: 1.3rem;
+  height: 1.3rem;
+  accent-color: #6b55b8;
+}
+
+.link-button {
+  padding: 0;
+  color: #1f5fbf;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: #0f3f8f;
+}
+
 .comic-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));

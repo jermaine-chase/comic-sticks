@@ -196,6 +196,42 @@ describe('ComicContainerComponent', () => {
     expect(root.querySelector('app-questions')!.textContent).toContain('Who shouted?');
   });
 
+  it('hides and shows the feeling words without drawing the comic again', async () => {
+    await renderStory();
+    const toggle = root.querySelector<HTMLInputElement>('input[name="show-feelings"]')!;
+    expect(root.querySelectorAll('.panel .feeling').length).toBe(2);
+
+    toggle.click();
+    await fixture.whenStable();
+
+    expect(root.querySelectorAll('.panel .feeling').length).toBe(0);
+    // The faces still show the feeling.
+    expect(root.querySelector('.panel app-stick-figure svg')!.getAttribute('aria-label')).toContain(
+      'surprised',
+    );
+
+    toggle.click();
+    await fixture.whenStable();
+    expect(root.querySelectorAll('.panel .feeling').length).toBe(2);
+  });
+
+  it('opens the emotion key with this comic’s faces first, and closes it with Escape', async () => {
+    await renderStory();
+    clickButton('Emotion key: what each face means');
+    await fixture.whenStable();
+
+    const key = root.querySelector('app-emotion-key')!;
+    expect(key.querySelector('[role="dialog"]')).toBeTruthy();
+    const first = Array.from(key.querySelectorAll('li.in-comic')).map((li) =>
+      li.getAttribute('data-expression'),
+    );
+    expect(first).toEqual(['surprised', 'neutral', 'confused']);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await fixture.whenStable();
+    expect(root.querySelector('app-emotion-key')).toBeNull();
+  });
+
   it('shows the estimate and calls nothing further until confirmed', async () => {
     await reachConfirmation();
 

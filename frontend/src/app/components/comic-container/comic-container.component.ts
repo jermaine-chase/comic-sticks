@@ -25,6 +25,7 @@ import { QuestionsComponent } from '../bookends/questions.component';
 import { RecapComponent } from '../bookends/recap.component';
 import { WhosWhoComponent } from '../bookends/whos-who.component';
 import { ComicPanelComponent } from '../comic-panel/comic-panel.component';
+import { EmotionKeyComponent } from '../emotion-key/emotion-key.component';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
 
 const CAST_COLORS = ['#1b1b1f', '#c8321f', '#1f5fbf', '#1c8a4a', '#8a3fb8', '#b85f00'];
@@ -49,6 +50,7 @@ function describeDuration(seconds: number): string {
     RecapComponent,
     QuestionsComponent,
     CharacterSheetComponent,
+    EmotionKeyComponent,
   ],
   templateUrl: './comic-container.component.html',
   styleUrl: './comic-container.component.css',
@@ -78,6 +80,22 @@ export class ComicContainerComponent {
     notes: this.notes(),
     questions: this.questions(),
   }));
+
+  /** Shows or hides the feeling tags on the finished comic, without drawing it again. */
+  protected readonly showFeelings = signal(true);
+  protected readonly keyOpen = signal(false);
+
+  protected readonly hasFeelings = computed(
+    () => this.story()?.panels.some((p) => p.characters.some((c) => c.feeling)) ?? false,
+  );
+
+  /** The faces this comic shows, in the order they first appear, for the emotion key. */
+  protected readonly usedExpressions = computed(() => [
+    ...new Set([
+      ...(this.story()?.panels ?? []).flatMap((p) => p.characters.map((c) => c.expression)),
+      ...(this.story()?.bookends?.recap ?? []).flatMap((r) => (r.expression ? [r.expression] : [])),
+    ]),
+  ]);
 
   /** Set between checking the run time and the user's decision, and during the run itself. */
   protected readonly estimate = signal<ComicEstimate | null>(null);

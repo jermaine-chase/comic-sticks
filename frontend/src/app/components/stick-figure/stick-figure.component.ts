@@ -37,7 +37,12 @@ const FACE_INK = '#1b1b1f';
     }
   `,
   template: `
-    <svg viewBox="0 0 120 190" role="img" [attr.aria-label]="label">
+    <svg
+      [attr.viewBox]="viewBox"
+      [style.overflow]="crop === 'head' ? 'hidden' : null"
+      role="img"
+      [attr.aria-label]="label"
+    >
       <g
         [attr.transform]="mirror"
         [attr.stroke]="ink"
@@ -175,6 +180,17 @@ export class StickFigureComponent {
   @Input() name = 'Stick figure';
   /** The character's fixed look from the sheet. Its colour wins over `color`. */
   @Input() design: CharacterDesign | null = null;
+  /** 'head' shows only a close-up of the face, as in the emotion key. */
+  @Input() crop: 'full' | 'head' = 'full';
+
+  /** A square around the head, with room for the face's marks and symbol. */
+  protected get viewBox(): string {
+    if (this.crop !== 'head') {
+      return '0 0 120 190';
+    }
+    const [x, y] = this.skeleton.head;
+    return `${x - 43} ${y - 48} 86 86`;
+  }
 
   protected get ink(): string {
     return this.design?.color || this.color;

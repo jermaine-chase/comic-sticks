@@ -124,6 +124,18 @@ below about 1rem), and finally a scrolling bubble area as a last resort. A bubbl
 across the tail of an earlier bubble from another speaker, and the bubble area never moves down
 over the figures' heads. With no caption, bubbles may also use the top of the panel.
 
+### Reading the finished comic
+
+Two things on the finished comic change how it is shown, never the comic itself:
+
+- **Show feeling words** hides or shows the feeling tags at once, without drawing the comic
+  again. The faces still show each feeling. (The `feelingLabels` option, set before drawing,
+  decides whether the tags are made at all.)
+- **Emotion key: what each face means** opens a list of every face the app can draw, as a
+  close-up by the same stick figure the panels use, with its word, what it means and the clues on
+  the face that show it (`EMOTION_CLUES` in `emotion-key.component.ts`). Faces in this comic come
+  first. It closes with Escape, its Close button or a click outside it.
+
 ### Chapter bookends
 
 Every comic opens and closes the same way (`bookends` in the response):
@@ -233,4 +245,5 @@ drawing. The LLM schemas are built from the Java enums, so they pick up the chan
 | Hats, hair, accessories, ears, tails, snouts                          | `Hat`, `Hair`, `Accessory`, `Ears`, `AnimalTail`, `Snout` | `stick-figure.features.ts` |
 | Place backgrounds                                                     | `Background`                      | `panel-background.component.ts` |
 
-A new expression should also get its feeling words in `FeelingExpressions`.
+A new expression should also get its feeling words in `FeelingExpressions`, and its meaning and
+clues in `EMOTION_CLUES` (the emotion key's spec fails until it has them).
