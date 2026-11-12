@@ -83,6 +83,14 @@ timeout and upload limits, the run time estimate (`comic.llm.seconds-*`), the su
    `FOUR_LEGGED_SKELETONS`, where poses that use the arms lift a front paw). People are always
    upright and have no species. The sheet editor sets an animal's parts and stance when its
    species is chosen, and each can then be changed.
+
+   There are 26 background presets, indoors (room, kitchen, bedroom, school, library, shop,
+   burrow, cave, tunnel) and out (field, forest, garden, park, playground, farm, riverbank, lake,
+   beach, boat, town, street, castle, mountain, snow, station). They share one quiet style
+   (`backgrounds.ts`): the floor or ground always starts at the same line, two or three plain
+   landmarks sit at the sides and back, and the colours stay soft so figures and bubbles stand
+   out. At night skies darken, house and shop windows light up, the sun and clouds go, and outdoor
+   scenes get a moon and a few stars.
 3. `POST /api/comics/generate` sends the story to the LLM one part at a time, in order, and joins
    the panels. Every part is given the sheet, and every figure is drawn from it by name, so a
    character looks the same in every panel. Anyone a panel names who is not on the sheet gets a
@@ -269,7 +277,7 @@ drawing. The LLM schemas are built from the Java enums, so they pick up the chan
 | Hats, hair, accessories, ears, tails, snouts                          | `Hat`, `Hair`, `Accessory`, `Ears`, `AnimalTail`, `Snout` | `stick-figure.features.ts` |
 | Species (with its default parts and stance on the Java value and in `SPECIES_DEFAULTS`) | `Species` | `SPECIES_SKIN` and `speciesMarks` in `stick-figure.features.ts` |
 | Four-legged poses (every pose needs one)                              | `Pose`                            | `FOUR_LEGGED_SKELETONS` in `stick-figure.poses.ts` |
-| Place backgrounds                                                     | `Background`                      | `panel-background.component.ts` |
+| Place backgrounds (and a demo keyword in `DemoCharacterFinder`)       | `Background`                      | `BACKGROUND_ART` in `backgrounds.ts` |
 | Objects and background animals (list its words on the Java value too) | `Thing`                           | `things.drawings.ts`            |
 
 A new expression should also get its feeling words in `FeelingExpressions`, and its meaning and

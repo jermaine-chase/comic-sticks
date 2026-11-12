@@ -58,15 +58,28 @@ public class DemoCharacterFinder implements CharacterFinder {
         place("river|riverbank|bank|stream", "The river bank", "Grass beside the water.", Background.RIVERBANK);
         place("wood|woods|forest", "The wood", "Lots of trees.", Background.FOREST);
         place("burrow|tunnel|hole", "The burrow", "A home under the ground.", Background.BURROW);
-        place("house|home|kitchen|room|attic|hall", "Home", "Inside a house.", Background.ROOM);
+        place("kitchen", "The kitchen", "Where food is made.", Background.KITCHEN);
+        place("bedroom|bed", "The bedroom", "A room with a bed.", Background.BEDROOM);
+        place("house|home|room|attic|hall", "Home", "Inside a house.", Background.ROOM);
         place("garden", "The garden", "Grass and flowers.", Background.GARDEN);
+        place("park", "The park", "Grass, trees and a bench.", Background.PARK);
+        place("playground|swings?|slide", "The playground", "Swings and a slide.", Background.PLAYGROUND);
+        place("farm|barn|farmyard", "The farm", "A barn and fields.", Background.FARM);
         place("field|meadow|hill", "The field", "Open grass.", Background.FIELD);
-        place("town|village|street|road", "The town", "Houses and a street.", Background.TOWN);
+        place("lake|pond", "The lake", "Still water with hills behind.", Background.LAKE);
+        place("mountains?|peak|cliff", "The mountain", "High rocky mountains.", Background.MOUNTAIN);
+        place("snow|snowy|ice|icy", "The snow", "Everything is white with snow.", Background.SNOW);
+        place("street|road", "The street", "Shops and a road.", Background.STREET);
+        place("town|village", "The town", "Houses and a street.", Background.TOWN);
+        place("shop|store|market", "The shop", "Shelves of things to buy.", Background.SHOP);
+        place("library|bookshop", "The library", "Shelves of books.", Background.LIBRARY);
+        place("station|platform|train", "The station", "Where trains stop.", Background.STATION);
         place("castle|palace", "The castle", "A big stone castle.", Background.CASTLE);
         place("school|classroom", "School", "A classroom.", Background.SCHOOL);
         place("beach|sea|shore", "The beach", "Sand next to the sea.", Background.BEACH);
         place("boat|ship", "The boat", "A boat on the water.", Background.BOAT);
         place("cave", "The cave", "A dark cave.", Background.CAVE);
+        place("subway|underground|mine", "The tunnel", "A long tunnel under the ground.", Background.TUNNEL);
     }
 
     private static void place(String words, String name, String description, Background background) {

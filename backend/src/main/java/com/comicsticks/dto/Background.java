@@ -17,5 +17,18 @@ public enum Background {
     @JsonProperty("castle") CASTLE,
     @JsonProperty("school") SCHOOL,
     @JsonProperty("beach") BEACH,
-    @JsonProperty("boat") BOAT
+    @JsonProperty("boat") BOAT,
+    @JsonProperty("kitchen") KITCHEN,
+    @JsonProperty("bedroom") BEDROOM,
+    @JsonProperty("shop") SHOP,
+    @JsonProperty("library") LIBRARY,
+    @JsonProperty("street") STREET,
+    @JsonProperty("park") PARK,
+    @JsonProperty("playground") PLAYGROUND,
+    @JsonProperty("farm") FARM,
+    @JsonProperty("mountain") MOUNTAIN,
+    @JsonProperty("snow") SNOW,
+    @JsonProperty("lake") LAKE,
+    @JsonProperty("station") STATION,
+    @JsonProperty("tunnel") TUNNEL
 }

@@ -214,6 +214,19 @@ export const BACKGROUNDS = [
   'school',
   'beach',
   'boat',
+  'kitchen',
+  'bedroom',
+  'shop',
+  'library',
+  'street',
+  'park',
+  'playground',
+  'farm',
+  'mountain',
+  'snow',
+  'lake',
+  'station',
+  'tunnel',
 ] as const;
 export type Background = (typeof BACKGROUNDS)[number];
 
