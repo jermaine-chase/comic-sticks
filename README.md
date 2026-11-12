@@ -19,6 +19,24 @@ HTML/CSS speech bubbles.
 
 ## Run it
 
+Comics are saved to PostgreSQL, so the backend needs it running (except in the demo profile,
+below). Create the database once, and give the backend its password through an environment
+variable:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\createdb.exe" -U postgres comic_sticks
+$env:DB_PASSWORD = "<your postgres password>"
+```
+
+| Variable      | Default                                       | Purpose            |
+| ------------- | --------------------------------------------- | ------------------ |
+| `DB_URL`      | `jdbc:postgresql://localhost:5432/comic_sticks` | JDBC URL         |
+| `DB_USER`     | `postgres`                                    | Database user      |
+| `DB_PASSWORD` | (empty)                                       | Database password  |
+
+Flyway creates and updates the tables when the backend starts (`src/main/resources/db/migration`).
+Without a reachable database the backend does not start.
+
 Backend, in one terminal (PowerShell):
 
 ```powershell
@@ -29,7 +47,9 @@ mvn spring-boot:run
 To try the app without any LLM, use the demo profile instead. It splits the text the same way, but
 fills every field with simple rules (quoted text becomes speech, feeling words become feelings, a
 short list of idioms becomes notes, capitalized names become characters, named objects and animals
-are drawn), so its comics are much cruder than an LLM's:
+are drawn), so its comics are much cruder than an LLM's. It saves comics to an in-memory H2
+database instead of PostgreSQL, so they are gone when it stops (set `DEMO_DB_URL`, for example to
+`jdbc:h2:file:./data/demo`, to keep them):
 
 ```powershell
 mvn spring-boot:run "-Dspring-boot.run.profiles=demo"
@@ -255,6 +275,26 @@ A generate response:
   }
 }
 ```
+
+### Saved comics
+
+On the finished comic, **Save this comic** stores it as it is now, edits included. After that the
+button reads **Saved**, and **Save changes** once anything is edited again. **My comics** lists
+every saved comic, most recently saved first; **Open** shows one exactly as it was saved, with the
+options it was drawn with, and **Delete** asks once more before deleting.
+
+| Request                        | Body                    | Returns                                       |
+| ------------------------------ | ----------------------- | --------------------------------------------- |
+| `POST /api/saved-comics`       | `{ comic, options }`    | 201, `{ id, title, panelCount, createdAt, updatedAt }` |
+| `GET /api/saved-comics`        |                         | that summary for every comic, newest first   |
+| `GET /api/saved-comics/{id}`   |                         | the summary plus `comic` and `options`        |
+| `PUT /api/saved-comics/{id}`   | `{ comic, options }`    | the summary                                   |
+| `DELETE /api/saved-comics/{id}`|                         | 204                                           |
+
+`comic` is a generate response, and `options` the request options it was drawn with. Ids are
+UUIDs; anything else gets a 400, and an unknown id a 404. The comic is stored as JSON text in the
+`saved_comic` table, so it comes back exactly as saved; comics larger than
+`comic.saved.max-json-chars` are refused.
 
 Errors are RFC 9457 problem documents, and their `detail` field is safe to show to users.
 

@@ -400,3 +400,21 @@ export interface AnswerChoice {
   character: string | null;
   panelNumber: number | null;
 }
+
+// --- Saved comics ----------------------------------------------------------------------------
+
+/** One saved comic in the "My comics" list. Times are ISO 8601 strings. */
+export interface SavedComicSummary {
+  id: string;
+  title: string;
+  panelCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A saved comic, exactly as it was saved, with the options it was drawn with. */
+export interface SavedComic extends SavedComicSummary {
+  comic: ComicStory;
+  /** Older saves, or saves made without options, may leave any of these out. */
+  options: Partial<ComicOptions>;
+}

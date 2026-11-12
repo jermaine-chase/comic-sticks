@@ -4,6 +4,20 @@
 </header>
 
 <main class="page">
+  <div class="library-bar">
+    <button
+      type="button"
+      class="button button-secondary"
+      [attr.aria-expanded]="libraryOpen()"
+      (click)="libraryOpen.set(!libraryOpen())"
+    >
+      {{ libraryOpen() ? 'Close my comics' : 'My comics' }}
+    </button>
+  </div>
+  @if (libraryOpen()) {
+    <app-saved-comics class="library" (open)="openSaved($event)" />
+  }
+
   <form class="composer" (submit)="$event.preventDefault(); checkRunTime()">
     <label class="composer-label" for="story-text">Your story</label>
     <textarea
@@ -172,6 +186,14 @@
       <p class="hint">Click any text to edit it. Hover over a figure to change its pose or face.</p>
 
       <div class="comic-tools">
+        <button
+          type="button"
+          class="button save-button"
+          [disabled]="saving() || (savedId() !== null && !hasUnsavedChanges())"
+          (click)="saveComic()"
+        >
+          {{ saveLabel() }}
+        </button>
         @if (hasFeelings()) {
           <label class="tool-switch">
             <input

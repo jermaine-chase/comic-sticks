@@ -233,6 +233,59 @@ describe('ComicContainerComponent', () => {
     expect(root.querySelector('app-emotion-key')).toBeNull();
   });
 
+  it('saves the comic, then saves edits over the same saved comic', async () => {
+    await renderStory();
+    const saveButton = () => root.querySelector<HTMLButtonElement>('.save-button')!;
+    expect(saveButton().textContent!.trim()).toBe('Save this comic');
+
+    saveButton().click();
+    const create = http.expectOne('/api/saved-comics');
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body.comic.title).toBe('The Map');
+    expect(create.request.body.options).toMatchObject({ supportLevel: 1, things: true });
+    create.flush({ id: 'abc', title: 'The Map', panelCount: 2, createdAt: '', updatedAt: '' });
+    await fixture.whenStable();
+    expect(saveButton().textContent!.trim()).toBe('Saved');
+    expect(saveButton().disabled).toBe(true);
+
+    await editText(root.querySelector<HTMLElement>('.comic-title')!, 'The Old Map');
+    expect(saveButton().textContent!.trim()).toBe('Save changes');
+    saveButton().click();
+    const update = http.expectOne('/api/saved-comics/abc');
+    expect(update.request.method).toBe('PUT');
+    expect(update.request.body.comic.title).toBe('The Old Map');
+    update.flush({ id: 'abc', title: 'The Old Map', panelCount: 2, createdAt: '', updatedAt: '' });
+    await fixture.whenStable();
+    expect(saveButton().textContent!.trim()).toBe('Saved');
+  });
+
+  it('opens a saved comic from My comics, with the options it was drawn with', async () => {
+    clickButton('My comics');
+    await fixture.whenStable();
+    http.expectOne('/api/saved-comics').flush([
+      { id: 'abc', title: 'The Map', panelCount: 2, createdAt: '', updatedAt: '2026-11-11T10:00:00Z' },
+    ]);
+    await fixture.whenStable();
+
+    clickButton('Open');
+    http.expectOne('/api/saved-comics/abc').flush({
+      id: 'abc',
+      title: 'The Map',
+      panelCount: 2,
+      createdAt: '',
+      updatedAt: '',
+      comic: STORY,
+      options: { supportLevel: 3, notes: false },
+    });
+    await fixture.whenStable();
+
+    expect(root.querySelector('app-saved-comics')).toBeNull();
+    expect(root.querySelectorAll('.panel').length).toBe(2);
+    expect(root.querySelector('.save-button')!.textContent!.trim()).toBe('Saved');
+    expect(root.querySelector<HTMLInputElement>('input[name="notes"]')!.checked).toBe(false);
+    expect(root.querySelector<HTMLInputElement>('input[name="feeling-labels"]')!.checked).toBe(true);
+  });
+
   it('shows the estimate and calls nothing further until confirmed', async () => {
     await reachConfirmation();
 
