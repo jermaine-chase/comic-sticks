@@ -1,5 +1,15 @@
 import { ComicCharacter, Dialogue } from '../../models/comic.models';
-import { bubbleLayout, facings, hasTail, headCenter, slotCenter, tailTo } from './panel-layout';
+import {
+  BUBBLE_FITS,
+  bubbleLayout,
+  bubblesOverflow,
+  facings,
+  hasTail,
+  headCenter,
+  nextFit,
+  slotCenter,
+  tailTo,
+} from './panel-layout';
 
 const figure = (name: string, facing: 'left' | 'right' = 'right'): ComicCharacter => ({
   name,
@@ -61,8 +71,8 @@ describe('panel layout', () => {
       dialogue: [says('Mia'), says('Leo')],
     };
 
-    const mia = bubbleLayout(panel, panel.dialogue[0]);
-    const leo = bubbleLayout(panel, panel.dialogue[1]);
+    const mia = bubbleLayout(panel, 0);
+    const leo = bubbleLayout(panel, 1);
 
     expect(mia.left + mia.width).toBeLessThanOrEqual(leo.left);
     expect(mia.left).toBeLessThan(25);
@@ -111,5 +121,65 @@ describe('panel layout', () => {
     const ys = tail.circles!.map((c) => c.cy);
     expect(ys).toEqual([...ys].sort((a, b) => a - b));
     expect(ys.at(-1)!).toBeLessThan(200 - 20);
+  });
+
+  describe('bubble fitting', () => {
+    const area = { left: 0, top: 40, right: 300, bottom: 200 };
+    const bubble = (top: number, bottom: number, contentHeight = bottom - top) => ({
+      box: { left: 10, top, right: 290, bottom },
+      contentHeight,
+      boxHeight: bottom - top,
+    });
+
+    it('sees no problem when every bubble is inside the area and shows all its text', () => {
+      expect(bubblesOverflow(area, [bubble(60, 120), bubble(140, 200)])).toBe(false);
+    });
+
+    it('sees text cut off when a bubble sticks out above the area', () => {
+      expect(bubblesOverflow(area, [bubble(10, 120), bubble(140, 200)])).toBe(true);
+    });
+
+    it('sees text cut off when it is taller than its own bubble', () => {
+      expect(bubblesOverflow(area, [bubble(60, 120, 90)])).toBe(true);
+    });
+
+    it('widens bubbles before shrinking lettering a little, and never hides text', () => {
+      const scales = BUBBLE_FITS.map((f) => f.scale);
+      const widths = BUBBLE_FITS.map((f) => f.minWidth);
+      expect(scales).toEqual([...scales].sort((a, b) => b - a));
+      expect(widths).toEqual([...widths].sort((a, b) => a - b));
+      expect(Math.min(...scales) * 1.15).toBeGreaterThanOrEqual(0.95);
+      const firstSmaller = BUBBLE_FITS.findIndex((f) => f.scale < 1);
+      expect(BUBBLE_FITS[firstSmaller - 1].minWidth).toBe(Math.max(...widths));
+      expect(BUBBLE_FITS.at(-1)!.scroll).toBe(true);
+    });
+
+    it('widens a bubble but keeps it inside the panel', () => {
+      const panel = {
+        characters: [figure('Mia'), figure('Leo')],
+        dialogue: [says('Leo'), says('Mia')],
+      };
+      expect(bubbleLayout(panel, 0)).toEqual({ left: 51, width: 48 });
+      expect(bubbleLayout(panel, 0, 96)).toEqual({ left: 4, width: 96 });
+    });
+
+    it('never widens a bubble across the tail of an earlier bubble above it', () => {
+      const panel = {
+        characters: [figure('Leo'), figure('Mum')],
+        dialogue: [says('Leo'), says('Mum')],
+      };
+      // Leo's tail runs down at 25% to his head, past Mum's bubble.
+      const mum = bubbleLayout(panel, 1, 96);
+      expect(mum.left).toBeGreaterThanOrEqual(25 + 7);
+      expect(mum.width).toBeGreaterThan(48);
+      expect(mum.left + mum.width).toBeLessThanOrEqual(100);
+    });
+
+    it('steps on only while text is cut off, and stops at the last step', () => {
+      expect(nextFit(0, false)).toBe(0);
+      expect(nextFit(0, true)).toBe(1);
+      const last = BUBBLE_FITS.length - 1;
+      expect(nextFit(last, true)).toBe(last);
+    });
   });
 });

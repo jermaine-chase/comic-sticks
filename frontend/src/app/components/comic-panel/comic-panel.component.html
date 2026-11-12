@@ -19,7 +19,13 @@
       ></p>
     }
 
-    <div class="bubbles">
+    <div
+      class="bubbles"
+      [class.bubbles-scroll]="fit().scroll"
+      [class.bubbles-tight]="fit().tight"
+      [class.bubbles-no-caption]="!p.caption"
+      [style.--bubble-scale]="fit().scale"
+    >
       @for (bubble of bubbles(); track $index; let lineIndex = $index) {
         <p
           class="bubble"

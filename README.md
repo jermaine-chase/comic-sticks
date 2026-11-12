@@ -117,6 +117,13 @@ A known feeling word sets the face (`FeelingExpressions`), so the label and face
 The frontend enforces the layout whatever the LLM chose: fixed figure slots, bubbles above their
 speakers, tails measured to end at the speaker's head, and speakers turned to face their listener.
 
+Bubbles always show all of their text. After a panel is drawn, `ComicPanelComponent` measures
+the bubbles and, while any text is cut off, tries the next step in `BUBBLE_FITS`
+(`panel-layout.ts`): wider bubbles, then tighter spacing, then slightly smaller lettering (never
+below about 1rem), and finally a scrolling bubble area as a last resort. A bubble never widens
+across the tail of an earlier bubble from another speaker, and the bubble area never moves down
+over the figures' heads. With no caption, bubbles may also use the top of the panel.
+
 ### Chapter bookends
 
 Every comic opens and closes the same way (`bookends` in the response):

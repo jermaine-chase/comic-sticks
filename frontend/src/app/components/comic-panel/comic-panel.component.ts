@@ -22,8 +22,11 @@ import { PanelBackgroundComponent } from './panel-background.component';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
 import {
+  BUBBLE_FITS,
   bubbleLayout,
+  bubblesOverflow,
   connector,
+  nextFit,
   facings,
   HEAD_RADIUS,
   FIGURE_CANVAS,
@@ -93,11 +96,18 @@ export class ComicPanelComponent {
     this.panel().characters.map((_, i, all) => slotCenter(i, all.length)),
   );
 
+  /** Which of BUBBLE_FITS the bubbles use. It steps up until no text is cut off. */
+  protected readonly fitStep = signal(0);
+  protected readonly fit = computed(() => BUBBLE_FITS[this.fitStep()]);
+  /** The panel and size the current fit was found for. A change starts the search again. */
+  private fitKey = '';
+
   protected readonly bubbles = computed(() => {
     const panel = this.panel();
+    const minWidth = this.fit().minWidth;
     return panel.dialogue.map((line, i) => ({
       line,
-      layout: bubbleLayout(panel, line),
+      layout: bubbleLayout(panel, i, minWidth),
       tail: hasTail(panel.dialogue, i),
     }));
   });
@@ -106,14 +116,23 @@ export class ComicPanelComponent {
     const destroyRef = inject(DestroyRef);
     afterRenderEffect({
       earlyRead: () => {
-        this.panel();
-        this.size();
-        return this.measure();
+        const key = JSON.stringify(this.panel()) + '|' + this.size();
+        this.fitStep();
+        return { key, ...this.measure() };
       },
       write: (measured) => {
-        const { tails, connectors } = measured();
+        const { key, tails, connectors, overflowing } = measured();
         this.tails.set(tails);
         this.connectors.set(connectors);
+        if (key !== this.fitKey) {
+          // New content or a new size: start again from the largest lettering.
+          this.fitKey = key;
+          if (this.fitStep() !== 0) {
+            this.fitStep.set(0);
+            return;
+          }
+        }
+        this.fitStep.set(nextFit(this.fitStep(), overflowing));
       },
     });
     // Tails depend on where text wrapped, so measure again when the panel changes size.
@@ -130,11 +149,11 @@ export class ComicPanelComponent {
     return `${speaker} ${verb ?? 'says'}`;
   }
 
-  private measure(): { tails: DrawnTail[]; connectors: string[] } {
+  private measure(): { tails: DrawnTail[]; connectors: string[]; overflowing: boolean } {
     const frame = this.frame().nativeElement;
     const box = frame.getBoundingClientRect();
     if (box.width === 0) {
-      return { tails: [], connectors: [] };
+      return { tails: [], connectors: [], overflowing: false };
     }
     const local = (r: DOMRect): Rect => ({
       left: r.left - box.left,
@@ -173,7 +192,19 @@ export class ComicPanelComponent {
       const radius = HEAD_RADIUS * ((figure.right - figure.left) / FIGURE_CANVAS.width);
       tails.push({ type: line.type, ...tailTo(bubble, head, radius, line.type === 'thought') });
     });
-    return { tails, connectors };
+    const areaEl = frame.querySelector<HTMLElement>('.bubbles');
+    const overflowing =
+      !!areaEl &&
+      !this.fit().scroll &&
+      bubblesOverflow(
+        local(areaEl.getBoundingClientRect()),
+        bubbleEls.map((el) => ({
+          box: local(el.getBoundingClientRect()),
+          contentHeight: el.scrollHeight,
+          boxHeight: el.clientHeight,
+        })),
+      );
+    return { tails, connectors, overflowing };
   }
 }
 

@@ -70,17 +70,46 @@ function nearest(from: number, candidates: number[]): number {
 /** Bubble width, as a share of the panel, by how many different characters speak in it. */
 const BUBBLE_WIDTHS = [84, 84, 48, 32, 25];
 
-/** Places a bubble over its speaker's slot, keeping it inside the panel. Values are percentages. */
-export function bubbleLayout(panel: Pick<Panel, 'characters' | 'dialogue'>, line: Dialogue) {
+/** How far a widened bubble keeps from the middle of another speaker's tail, in percent. */
+const TAIL_CLEARANCE = 7;
+
+/**
+ * Places the dialogue line at {@code lineIndex} over its speaker's slot, keeping it inside the
+ * panel. Values are percentages. {@code minWidth} widens a bubble whose text does not fit (see
+ * BUBBLE_FITS), but never across the tail of an earlier bubble from someone else: those tails run
+ * down past this bubble to their speakers' heads.
+ */
+export function bubbleLayout(
+  panel: Pick<Panel, 'characters' | 'dialogue'>,
+  lineIndex: number,
+  minWidth = 0,
+) {
+  const line = panel.dialogue[lineIndex];
   const count = Math.max(panel.characters.length, 1);
-  const index = Math.max(
-    panel.characters.findIndex((c) => c.name === line.speaker),
-    0,
-  );
+  const slotOf = (speaker: string) =>
+    slotCenter(Math.max(panel.characters.findIndex((c) => c.name === speaker), 0), count);
   const distinctSpeakers = new Set(panel.dialogue.map((d) => d.speaker)).size;
-  const width = BUBBLE_WIDTHS[distinctSpeakers] ?? BUBBLE_WIDTHS.at(-1)!;
-  const center = slotCenter(index, count);
-  const left = clamp(center - width / 2, 0, 100 - width);
+  const base = BUBBLE_WIDTHS[distinctSpeakers] ?? BUBBLE_WIDTHS.at(-1)!;
+  const center = slotOf(line.speaker);
+
+  let lo = 0;
+  let hi = 100;
+  panel.dialogue.slice(0, lineIndex).forEach((earlier, j) => {
+    if (earlier.speaker !== line.speaker && hasTail(panel.dialogue, j)) {
+      const tail = slotOf(earlier.speaker);
+      if (tail < center) {
+        lo = Math.max(lo, tail + TAIL_CLEARANCE);
+      } else if (tail > center) {
+        hi = Math.min(hi, tail - TAIL_CLEARANCE);
+      }
+    }
+  });
+
+  const width = Math.max(base, Math.min(minWidth, hi - lo));
+  const left =
+    width > base
+      ? clamp(center - width / 2, lo, hi - width)
+      : clamp(center - width / 2, 0, 100 - width);
   return { left, width };
 }
 
@@ -145,6 +174,58 @@ export function tailTo(bubble: Rect, head: Point, headRadius: number, thought: b
       `L${round(tip.x)},${round(tip.y)} ` +
       `L${round(baseX + TAIL_HALF_WIDTH)},${round(baseY)}`,
   };
+}
+
+/**
+ * How the bubbles are fitted into the panel, tried in order until every bubble shows all of its
+ * text. Each bubble has a row of its own, so bubbles first grow wider (staying over their speaker
+ * as far as they can), then the lettering shrinks, never below about 1rem. The last step lets the
+ * bubble area scroll, so text is never hidden. The bubble area never moves down over the figures'
+ * heads, where tails would cross the text.
+ *
+ * @param minWidth the narrowest a bubble may be, as a percentage of the panel's width
+ * @param scale    the lettering size, as a share of the normal size
+ * @param tight    whether the gaps between bubbles and the padding inside them are made smaller
+ */
+export interface BubbleFit {
+  minWidth: number;
+  scale: number;
+  tight: boolean;
+  scroll: boolean;
+}
+
+export const BUBBLE_FITS: readonly BubbleFit[] = [
+  { minWidth: 0, scale: 1, tight: false, scroll: false },
+  { minWidth: 66, scale: 1, tight: false, scroll: false },
+  { minWidth: 96, scale: 1, tight: false, scroll: false },
+  { minWidth: 96, scale: 1, tight: true, scroll: false },
+  { minWidth: 96, scale: 0.92, tight: true, scroll: false },
+  { minWidth: 96, scale: 0.85, tight: true, scroll: false },
+  { minWidth: 96, scale: 0.85, tight: true, scroll: true },
+];
+
+/**
+ * Whether any bubble's text is cut off: a bubble sticks out of the bubble area, or its text is
+ * taller than the bubble itself. Half a pixel is allowed for rounding.
+ */
+export function bubblesOverflow(
+  area: Rect,
+  bubbles: { box: Rect; contentHeight: number; boxHeight: number }[],
+): boolean {
+  const slack = 0.5;
+  return bubbles.some(
+    ({ box, contentHeight, boxHeight }) =>
+      box.top < area.top - slack ||
+      box.bottom > area.bottom + slack ||
+      box.left < area.left - slack ||
+      box.right > area.right + slack ||
+      contentHeight > boxHeight + slack,
+  );
+}
+
+/** The next fit to try: one step further while text is cut off, else the same one. */
+export function nextFit(step: number, overflowing: boolean): number {
+  return overflowing ? Math.min(step + 1, BUBBLE_FITS.length - 1) : step;
 }
 
 /** A short line joining a bubble to the next bubble from the same speaker. */
