@@ -74,11 +74,13 @@ export class ComicContainerComponent {
   protected readonly feelingLabels = signal(DEFAULT_OPTIONS.feelingLabels);
   protected readonly notes = signal(DEFAULT_OPTIONS.notes);
   protected readonly questions = signal(DEFAULT_OPTIONS.questions);
+  protected readonly things = signal(DEFAULT_OPTIONS.things);
   private readonly options = computed<ComicOptions>(() => ({
     supportLevel: this.supportLevel(),
     feelingLabels: this.feelingLabels(),
     notes: this.notes(),
     questions: this.questions(),
+    things: this.things(),
   }));
 
   /** Shows or hides the feeling tags on the finished comic, without drawing it again. */
@@ -165,7 +167,7 @@ export class ComicContainerComponent {
   }
 
   /** The toggles change which LLM calls run, so any estimate is out of date. */
-  protected setToggle(toggle: 'feelingLabels' | 'notes' | 'questions', on: boolean): void {
+  protected setToggle(toggle: 'feelingLabels' | 'notes' | 'questions' | 'things', on: boolean): void {
     this.estimate.set(null);
     this[toggle].set(on);
   }

@@ -18,7 +18,8 @@ public record ComicProperties(Llm llm, Story story, Characters characters, Booke
             double secondsPerNotesCall,
             double secondsPerCharacterChunk,
             double secondsPerBookendsCall,
-            double secondsPerQuestionsCall) {
+            double secondsPerQuestionsCall,
+            double secondsPerThingsCall) {
     }
 
     /**

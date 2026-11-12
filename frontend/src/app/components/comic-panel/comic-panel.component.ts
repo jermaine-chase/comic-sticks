@@ -21,6 +21,7 @@ import {
 import { PanelBackgroundComponent } from './panel-background.component';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
+import { ThingComponent } from '../things/thing.component';
 import {
   BUBBLE_FITS,
   bubbleLayout,
@@ -28,6 +29,8 @@ import {
   connector,
   nextFit,
   facings,
+  groundThings,
+  heldBy,
   HEAD_RADIUS,
   FIGURE_CANVAS,
   hasTail,
@@ -55,7 +58,7 @@ interface DrawnTail extends Tail {
  */
 @Component({
   selector: 'app-comic-panel',
-  imports: [StickFigureComponent, EditableTextDirective, PanelBackgroundComponent],
+  imports: [StickFigureComponent, EditableTextDirective, PanelBackgroundComponent, ThingComponent],
   templateUrl: './comic-panel.component.html',
   styleUrl: './comic-panel.component.css',
 })
@@ -93,6 +96,14 @@ export class ComicPanelComponent {
 
   /** The facing the layout enforces, so a speaker always looks at their listener. */
   protected readonly facing = computed(() => facings(this.panel()));
+
+  /** What each figure holds, in the order of the panel's characters. */
+  protected readonly held = computed(() =>
+    this.panel().characters.map((c) => heldBy(this.panel(), c.name)),
+  );
+
+  /** Things nobody in the panel holds, placed on the ground clear of the figures. */
+  protected readonly groundThings = computed(() => groundThings(this.panel()));
 
   protected readonly slots = computed(() =>
     this.panel().characters.map((_, i, all) => slotCenter(i, all.length)),

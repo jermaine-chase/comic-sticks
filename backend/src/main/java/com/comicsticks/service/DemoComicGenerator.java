@@ -26,6 +26,8 @@ import com.comicsticks.dto.PanelDto;
 import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.Scene;
+import com.comicsticks.dto.Thing;
+import com.comicsticks.dto.ThingDto;
 import com.comicsticks.service.StorySegmenter.Part;
 
 /**
@@ -39,7 +41,9 @@ import com.comicsticks.service.StorySegmenter.Part;
  * <li>a feeling word in the text, such as "afraid", becomes the feeling of the character it is
  * about, and sets the face;
  * <li>an opening phrase such as "Later that night" or "Back at the river" becomes the caption;
- * <li>a short list of common idioms becomes "what it means" notes.
+ * <li>a short list of common idioms becomes "what it means" notes;
+ * <li>an object or animal the text names is drawn, in the hand of a character who holds, carries,
+ * takes or finds it in the same sentence.
  * </ul>
  *
  * Real adaptation needs the LLM.
@@ -55,6 +59,9 @@ public class DemoComicGenerator implements ComicGenerator {
     private static final Pattern SCENE_CHANGE = Pattern.compile(
             "^(?:Later(?: that \\w+)?|Meanwhile|Soon|Hours later|Days later|Years later|The next (?:day|morning|night)"
                     + "|That (?:night|evening|morning|afternoon)|Back (?:at|in|on|home)(?: the \\w+)?)\\b");
+    private static final Pattern HOLDS = Pattern.compile(
+            "(?i)\\b(?:held|holds|holding|carried|carries|carrying|picked up|picks up|took|takes|grabbed|grabs"
+                    + "|found|finds|lifted|lifts)\\b");
     private static final Pattern NIGHT = Pattern.compile("(?i)\\b(night|dark|moon|stars|midnight|evening)\\b");
     private static final Pattern INDOOR = Pattern.compile(
             "(?i)\\b(room|house|home|kitchen|attic|hall|burrow|cave|inside|bed|castle|school)\\b");
@@ -124,8 +131,9 @@ public class DemoComicGenerator implements ComicGenerator {
                 boolean last = g == groups.size() - 1;
                 List<NoteDto> notes = last && options.notes() ? notes(part.sourceText()) : List.of();
                 PanelDto panel = buildPanel(text, panels.size(), cast, options);
+                List<ThingDto> things = options.things() ? things(text, cast) : List.of();
                 panels.add(new PanelDto(panel.panelNumber(), panel.scene(), panel.caption(), panel.characters(),
-                        panel.dialogue(), last ? part.sourceText() : "", notes, place));
+                        panel.dialogue(), last ? part.sourceText() : "", notes, place, things));
             }
         }
         return sheetRules.reconcile(new ComicStoryResponse("Demo Comic", panels), sheet);
@@ -249,6 +257,58 @@ public class DemoComicGenerator implements ComicGenerator {
             return Scene.NIGHT;
         }
         return INDOOR.matcher(text).find() ? Scene.INDOOR : Scene.OUTDOOR;
+    }
+
+    /**
+     * The objects and animals the text names, in order, at most {@link PanelValidator#MAX_THINGS}. A
+     * thing is held by the cast member who, in the same sentence, holds, carries, takes or finds it.
+     */
+    static List<ThingDto> things(String text, List<String> cast) {
+        List<ThingDto> things = new ArrayList<>();
+        for (Thing thing : ThingWords.namedIn(text)) {
+            if (cast.stream().anyMatch(name -> ThingWords.isNameOf(name, thing))) {
+                continue;
+            }
+            things.add(new ThingDto(thing, thing.canBeHeld() ? holderOf(text, thing, cast) : ""));
+            if (things.size() == PanelValidator.MAX_THINGS) {
+                break;
+            }
+        }
+        return things;
+    }
+
+    private static String holderOf(String text, Thing thing, List<String> cast) {
+        int at = ThingWords.firstIndex(text, thing).orElse(-1);
+        Matcher sentence = SENTENCE.matcher(text);
+        while (sentence.find()) {
+            if (at < sentence.start() || at >= sentence.end()) {
+                continue;
+            }
+            String before = text.substring(sentence.start(), at);
+            Matcher verb = HOLDS.matcher(before);
+            int verbAt = -1;
+            while (verb.find()) {
+                verbAt = verb.start();
+            }
+            return verbAt < 0 ? "" : nearestNameBefore(before.substring(0, verbAt), cast);
+        }
+        return "";
+    }
+
+    /** The cast member named last in {@code text}, or "" when none is. */
+    private static String nearestNameBefore(String text, List<String> cast) {
+        String best = "";
+        int bestEnd = -1;
+        for (String name : cast) {
+            Matcher m = Pattern.compile("\\b" + Pattern.quote(name) + "\\b").matcher(text);
+            while (m.find()) {
+                if (m.end() > bestEnd) {
+                    bestEnd = m.end();
+                    best = name;
+                }
+            }
+        }
+        return best;
     }
 
     /** Notes for the idioms the demo knows, quoting the phrase exactly as the text has it. */

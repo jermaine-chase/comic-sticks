@@ -66,6 +66,16 @@
         />
         <span><strong>Questions</strong> A few picture questions at the end.</span>
       </label>
+      <label class="setting-choice">
+        <input
+          type="checkbox"
+          name="things"
+          [checked]="things()"
+          [disabled]="loading()"
+          (change)="setToggle('things', $any($event.target).checked)"
+        />
+        <span><strong>Objects and animals</strong> Draws things the story names, like a key or a dog.</span>
+      </label>
     </fieldset>
 
     <div class="composer-actions">

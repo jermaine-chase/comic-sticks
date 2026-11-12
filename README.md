@@ -28,8 +28,8 @@ mvn spring-boot:run
 
 To try the app without any LLM, use the demo profile instead. It splits the text the same way, but
 fills every field with simple rules (quoted text becomes speech, feeling words become feelings, a
-short list of idioms becomes notes, capitalized names become characters), so its comics are much
-cruder than an LLM's:
+short list of idioms becomes notes, capitalized names become characters, named objects and animals
+are drawn), so its comics are much cruder than an LLM's:
 
 ```powershell
 mvn spring-boot:run "-Dspring-boot.run.profiles=demo"
@@ -112,6 +112,17 @@ models:
    `thought` bubbles (what a character thinks, wants or plans) are drawn as clouds and not checked.
 2. **Notes** (if on). "What it means" notes for idioms, metaphors, sarcasm and old words. A note is
    kept only if its `phrase` appears in the panel's `sourceText`.
+3. **Things** (`things`, on by default). Up to 3 objects or background animals to draw, from the
+   `Thing` enum (a key, a map, a lamp, a tree, a door, a dog, a horse...), each with an optional
+   `holder` chosen from the characters in the part's panels. A thing is kept only if the part's
+   text names it, using the words listed on each `Thing` value ("dog, puppy, hound"), as whole
+   words with plurals. Only small objects can be held; an animal character named "Dog" is not also
+   drawn as a background dog. A failed call just means no things.
+
+The frontend draws a held thing in the holder's hand (front hand, then back hand, at most two),
+and the rest on the ground: large things (tree, door, chair, table, bed, ladder) behind the
+figures, everything else in front, each in the fixed spot farthest from the figures and from each
+other (`groundThings` in `panel-layout.ts`). The drawings are in `things.drawings.ts`.
 
 A known feeling word sets the face (`FeelingExpressions`), so the label and face never disagree.
 The frontend enforces the layout whatever the LLM chose: fixed figure slots, bubbles above their
@@ -153,10 +164,11 @@ Every comic opens and closes the same way (`bookends` in the response):
 must be in the chapter, and sentences stay short. `comic.bookends.*` limits how much of the
 chapter the calls see.
 
-The estimate is `parts x (seconds-per-part + seconds-per-notes-call) + panels x seconds-per-panel`
-`+ seconds-per-bookends-call (+ seconds-per-questions-call)`
+The estimate is `parts x (seconds-per-part + seconds-per-notes-call + seconds-per-things-call)`
+`+ panels x seconds-per-panel + seconds-per-bookends-call (+ seconds-per-questions-call)`
 (+ `chunks x seconds-per-character-chunk` when no sheet is supplied)
-(all under `comic.llm`; the notes term only when notes are on, and retries are not counted). The
+(all under `comic.llm`; the notes and things terms only when those options are on, and retries are
+not counted). The
 defaults were measured with `qwen2.5-coder:7b` on one machine with the model already loaded, so
 retune them after changing model or hardware: the backend logs how long each part took.
 
@@ -176,8 +188,8 @@ curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf" -F "support
 Pass that sheet back, edited, as `characterSheet` (a JSON object, or a JSON string form field in a
 multipart request) to `/estimate` and `/generate`.
 
-`supportLevel` (default 1), `feelingLabels` and `notes` (both default `true`) and `questions`
-(default `false`) are optional. When a toggle is off, that field is not requested from the LLM at
+`supportLevel` (default 1), `feelingLabels`, `notes` and `things` (all default `true`) and
+`questions` (default `false`) are optional. When a toggle is off, that field is not requested from the LLM at
 all.
 
 An estimate response:
@@ -202,7 +214,8 @@ A generate response:
       "dialogue": [{ "speaker": "Mia", "text": "Look at this!", "type": "shout" }],
       "sourceText": "Mia found a map in the attic. \"Look at this!\" she shouted.",
       "notes": [],
-      "place": "The attic"
+      "place": "The attic",
+      "things": [{ "thing": "map", "holder": "Mia" }]
     }
   ],
   "characters": [
@@ -244,6 +257,7 @@ drawing. The LLM schemas are built from the Java enums, so they pick up the chan
 | Dialogue types                                                        | `DialogueType`                    | `comic-panel.component.css`     |
 | Hats, hair, accessories, ears, tails, snouts                          | `Hat`, `Hair`, `Accessory`, `Ears`, `AnimalTail`, `Snout` | `stick-figure.features.ts` |
 | Place backgrounds                                                     | `Background`                      | `panel-background.component.ts` |
+| Objects and background animals (list its words on the Java value too) | `Thing`                           | `things.drawings.ts`            |
 
 A new expression should also get its feeling words in `FeelingExpressions`, and its meaning and
 clues in `EMOTION_CLUES` (the emotion key's spec fails until it has them).

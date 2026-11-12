@@ -12,6 +12,7 @@ import com.comicsticks.dto.DialogueDto;
 import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.NoteDto;
 import com.comicsticks.dto.PanelDto;
+import com.comicsticks.dto.ThingDto;
 
 /**
  * Holds the LLM to the comic's content rules, which a JSON Schema cannot express:
@@ -19,7 +20,8 @@ import com.comicsticks.dto.PanelDto;
  * <ul>
  * <li>speech, shout and whisper bubbles must be words actually spoken in the text;
  * <li>a note's phrase must appear in the source text, and its meaning is kept short;
- * <li>a feeling is one plain word, and the face matches it.
+ * <li>a feeling is one plain word, and the face matches it;
+ * <li>an object or animal is only drawn when the text names it.
  * </ul>
  */
 @Component
@@ -27,6 +29,7 @@ public class PanelValidator {
 
     private static final int MAX_MEANING_SENTENCES = 2;
     private static final int MAX_NOTES = 3;
+    static final int MAX_THINGS = 3;
 
     /** Describes each bubble that is not spoken in the text, for a retry prompt. Empty when all pass. */
     public List<String> dialogueProblems(List<PanelDto> panels, String text) {
@@ -67,6 +70,34 @@ public class PanelValidator {
             }
             kept.add(new NoteDto(note.phrase().strip(), shortened(note.meaning().strip())));
             if (kept.size() == MAX_NOTES) {
+                break;
+            }
+        }
+        return kept;
+    }
+
+    /**
+     * Keeps things that {@code sourceText} names, once each, at most {@link #MAX_THINGS}. A holder
+     * is kept only when it is one of {@code names} (in that spelling) and the thing can be held. A
+     * thing whose word is a character's name, such as an animal character called "Dog", is that
+     * character, so it is dropped.
+     */
+    public List<ThingDto> validThings(List<ThingDto> things, String sourceText, List<String> names) {
+        if (things == null) {
+            return List.of();
+        }
+        List<ThingDto> kept = new ArrayList<>();
+        for (ThingDto candidate : things) {
+            if (candidate == null || candidate.thing() == null
+                    || !ThingWords.names(sourceText, candidate.thing())
+                    || names.stream().anyMatch(name -> ThingWords.isNameOf(name, candidate.thing()))
+                    || kept.stream().anyMatch(k -> k.thing() == candidate.thing())) {
+                continue;
+            }
+            String holder = !candidate.thing().canBeHeld() || candidate.holder() == null ? ""
+                    : names.stream().filter(candidate.holder().strip()::equalsIgnoreCase).findFirst().orElse("");
+            kept.add(new ThingDto(candidate.thing(), holder));
+            if (kept.size() == MAX_THINGS) {
                 break;
             }
         }

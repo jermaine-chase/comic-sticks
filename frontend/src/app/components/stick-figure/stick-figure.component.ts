@@ -1,7 +1,8 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { CharacterDesign, Expression, Facing, Pose } from '../../models/comic.models';
-import { FeatureLayers, featureLayers } from './stick-figure.features';
+import { CharacterDesign, Expression, Facing, Pose, Thing } from '../../models/comic.models';
+import { THING_ART } from '../things/things.drawings';
+import { FeatureLayers, featureLayers, Shape } from './stick-figure.features';
 import {
   EYE_PATHS,
   Face,
@@ -14,6 +15,8 @@ import {
 } from './stick-figure.poses';
 
 const CANVAS_WIDTH = 120;
+/** The longer side of a held thing, in figure units: about the size of the head. */
+const HELD_SIZE = 30;
 const FACE_INK = '#1b1b1f';
 
 /** A posable stick figure on an inline SVG canvas. */
@@ -107,6 +110,11 @@ const FACE_INK = '#1b1b1f';
         <g class="features-front">
           <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.front }" />
         </g>
+        @for (item of heldItems; track $index) {
+          <g class="held" [attr.data-held]="item.thing" [attr.transform]="item.transform">
+            <ng-container *ngTemplateOutlet="shapes; context: { $implicit: item.shapes }" />
+          </g>
+        }
       </g>
       <ng-template #shapes let-list>
         @for (shape of list; track $index) {
@@ -182,6 +190,23 @@ export class StickFigureComponent {
   @Input() design: CharacterDesign | null = null;
   /** 'head' shows only a close-up of the face, as in the emotion key. */
   @Input() crop: 'full' | 'head' = 'full';
+  /** Things in the figure's hands: the first in the front hand, the second in the back hand. */
+  @Input() held: readonly Thing[] = [];
+
+  /** Each held thing, scaled to hand size and centred on its hand. */
+  protected get heldItems(): { thing: Thing; transform: string; shapes: Shape[] }[] {
+    const hands = [this.skeleton.frontArm[1], this.skeleton.backArm[1]];
+    return this.held.slice(0, 2).map((thing, i) => {
+      const art = THING_ART[thing];
+      const scale = HELD_SIZE / Math.max(art.width, art.height);
+      const [x, y] = hands[i];
+      return {
+        thing,
+        transform: `translate(${x - (art.width * scale) / 2},${y - (art.height * scale) / 2}) scale(${scale})`,
+        shapes: art.shapes,
+      };
+    });
+  }
 
   /** A square around the head, with room for the face's marks and symbol. */
   protected get viewBox(): string {

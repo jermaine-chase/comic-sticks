@@ -11,6 +11,7 @@ import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.Facing;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.Scene;
+import com.comicsticks.dto.Thing;
 
 /**
  * The JSON Schema sent to the LLM as its required response format. It mirrors the DTO records,
@@ -80,6 +81,20 @@ final class ComicSchema {
                 "phrase", string(),
                 "meaning", string());
         return object("notes", arrayOf(note, 0, maxNotes));
+    }
+
+    /**
+     * The reply for the separate, small call that picks the objects and background animals to draw.
+     *
+     * @param holders the names of the characters in the passage's panels; "" means nobody holds it
+     */
+    static Map<String, Object> things(int maxThings, List<String> holders) {
+        List<String> choices = new ArrayList<>(holders);
+        choices.add("");
+        Map<String, Object> thing = object(
+                "thing", enumOf(Thing.values()),
+                "holder", Map.of("type", "string", "enum", choices));
+        return object("things", arrayOf(thing, 0, maxThings));
     }
 
     /** Builds an object schema from alternating property names and schemas, keeping their order. */

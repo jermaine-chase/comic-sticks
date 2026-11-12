@@ -1,9 +1,12 @@
-import { ComicCharacter, Dialogue } from '../../models/comic.models';
+import { ComicCharacter, Dialogue, PanelThing, THINGS } from '../../models/comic.models';
+import { THING_ART } from '../things/things.drawings';
 import {
   BUBBLE_FITS,
   bubbleLayout,
   bubblesOverflow,
   facings,
+  groundThings,
+  heldBy,
   hasTail,
   headCenter,
   nextFit,
@@ -121,6 +124,76 @@ describe('panel layout', () => {
     const ys = tail.circles!.map((c) => c.cy);
     expect(ys).toEqual([...ys].sort((a, b) => a - b));
     expect(ys.at(-1)!).toBeLessThan(200 - 20);
+  });
+
+  describe('things', () => {
+    const panel = (things: PanelThing[], names = ['Mia', 'Leo']) => ({
+      characters: names.map((n) => figure(n)),
+      things,
+    });
+
+    it('puts held things in the holder’s hands, at most two, and never large things', () => {
+      const p = panel([
+        { thing: 'map', holder: 'Mia' },
+        { thing: 'lamp', holder: 'Mia' },
+        { thing: 'key', holder: 'Mia' },
+        { thing: 'tree', holder: 'Mia' },
+        { thing: 'dog', holder: 'Leo' },
+      ]);
+
+      expect(heldBy(p, 'Mia')).toEqual(['map', 'lamp']);
+      expect(heldBy(p, 'Leo')).toEqual([]);
+      expect(groundThings(p).map((s) => s.thing)).toEqual(['tree', 'key', 'dog']);
+    });
+
+    it('puts a thing on the ground when its holder is not in the panel', () => {
+      const p = panel([{ thing: 'map', holder: 'Rat' }]);
+      expect(groundThings(p).map((s) => s.thing)).toEqual(['map']);
+    });
+
+    it('keeps loose things clear of the figures and of each other, inside the panel', () => {
+      const p = panel([
+        { thing: 'dog', holder: '' },
+        { thing: 'ball', holder: '' },
+        { thing: 'cat', holder: '' },
+      ]);
+      const spots = groundThings(p);
+      const figures = [25, 75];
+
+      for (const spot of spots) {
+        expect(spot.left - spot.width / 2).toBeGreaterThanOrEqual(0);
+        expect(spot.left + spot.width / 2).toBeLessThanOrEqual(100);
+        for (const f of figures) {
+          expect(Math.abs(spot.left - f)).toBeGreaterThan(spot.width / 2);
+        }
+      }
+      const sorted = [...spots].sort((a, b) => a.left - b.left);
+      for (let i = 1; i < sorted.length; i++) {
+        expect(sorted[i].left - sorted[i - 1].left).toBeGreaterThanOrEqual(
+          (sorted[i].width + sorted[i - 1].width) / 2,
+        );
+      }
+    });
+
+    it('stands large things behind the figures and places them first', () => {
+      const spots = groundThings(panel([{ thing: 'cat', holder: '' }, { thing: 'tree', holder: '' }]));
+
+      expect(spots.map((s) => [s.thing, s.behind])).toEqual([
+        ['tree', true],
+        ['cat', false],
+      ]);
+    });
+
+    it('places the same things in the same spots every time', () => {
+      const p = panel([{ thing: 'dog', holder: '' }]);
+      expect(groundThings(p)).toEqual(groundThings(p));
+    });
+
+    it('draws every thing', () => {
+      for (const thing of THINGS) {
+        expect(THING_ART[thing].shapes.length).toBeGreaterThan(0);
+      }
+    });
   });
 
   describe('bubble fitting', () => {

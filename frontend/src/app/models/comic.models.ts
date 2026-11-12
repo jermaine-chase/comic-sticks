@@ -76,6 +76,75 @@ export interface Panel {
   notes: Note[];
   /** The name of a place on the sheet, whose background is drawn. Empty when none. */
   place: string;
+  /** Objects and background animals the panel's text names, at most 3. Absent in older comics. */
+  things?: PanelThing[];
+}
+
+// --- Objects and background animals: matches the Java enum Thing. -------------------------
+
+/** Small objects, drawn in a hand when someone holds them, otherwise on the ground. */
+export const HELD_THINGS = [
+  'key',
+  'map',
+  'book',
+  'letter',
+  'bag',
+  'box',
+  'ball',
+  'cup',
+  'bottle',
+  'food',
+  'apple',
+  'cake',
+  'lamp',
+  'candle',
+  'torch',
+  'umbrella',
+  'phone',
+  'sword',
+  'shield',
+  'crown',
+  'rope',
+  'bucket',
+  'basket',
+  'coin',
+  'picture',
+  'clock',
+  'stick',
+  'rock',
+  'gift',
+  'flower',
+] as const;
+/** Large objects, drawn as scenery and never held. */
+export const LARGE_THINGS = ['tree', 'door', 'chair', 'table', 'bed', 'ladder'] as const;
+/** Animals that are not characters, drawn small as part of the scene. */
+export const ANIMAL_THINGS = [
+  'dog',
+  'cat',
+  'bird',
+  'owl',
+  'duck',
+  'chicken',
+  'horse',
+  'cow',
+  'sheep',
+  'pig',
+  'rabbit',
+  'mouse',
+  'fox',
+  'bear',
+  'frog',
+  'fish',
+  'snake',
+  'butterfly',
+] as const;
+export const THINGS = [...HELD_THINGS, ...LARGE_THINGS, ...ANIMAL_THINGS] as const;
+export type Thing = (typeof THINGS)[number];
+
+/** A thing in a panel. `holder` is the character holding it, or "" when it is on the ground. */
+export interface PanelThing {
+  thing: Thing;
+  holder: string;
 }
 
 export interface ComicStory {
@@ -201,6 +270,8 @@ export interface ComicOptions {
   notes: boolean;
   /** Simple comprehension questions with picture answers at the end of each chapter. */
   questions: boolean;
+  /** Objects and background animals that the text names, drawn in the panels. */
+  things: boolean;
 }
 
 export const DEFAULT_OPTIONS: ComicOptions = {
@@ -208,6 +279,7 @@ export const DEFAULT_OPTIONS: ComicOptions = {
   feelingLabels: true,
   notes: true,
   questions: false,
+  things: true,
 };
 
 export interface ComicEstimate {

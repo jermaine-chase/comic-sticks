@@ -61,6 +61,17 @@
     </svg>
 
     <div class="stage">
+      @for (spot of groundThings(); track $index) {
+        @if (spot.behind) {
+          <app-thing
+            class="ground-thing behind"
+            [thing]="spot.thing"
+            [label]="'A ' + spot.thing"
+            [style.left.%]="spot.left"
+            [style.width.%]="spot.width"
+          />
+        }
+      }
       @for (character of p.characters; track $index; let characterIndex = $index) {
         <div class="actor" [style.left.%]="slots()[characterIndex]">
           <app-stick-figure
@@ -71,6 +82,7 @@
             [color]="colorOf()(character.name)"
             [design]="designByName().get(character.name) ?? null"
             [name]="character.name"
+            [held]="held()[characterIndex]"
           />
           <span
             class="actor-name"
@@ -121,6 +133,17 @@
             </div>
           }
         </div>
+      }
+      @for (spot of groundThings(); track $index) {
+        @if (!spot.behind) {
+          <app-thing
+            class="ground-thing"
+            [thing]="spot.thing"
+            [label]="'A ' + spot.thing"
+            [style.left.%]="spot.left"
+            [style.width.%]="spot.width"
+          />
+        }
       }
     </div>
   </article>

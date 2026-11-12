@@ -67,10 +67,10 @@ public class ComicController {
     public ComicEstimateResponse estimateFromFile(@RequestParam("file") MultipartFile file,
             @RequestParam(required = false) Integer supportLevel,
             @RequestParam(required = false) Boolean feelingLabels, @RequestParam(required = false) Boolean notes,
-            @RequestParam(required = false) Boolean questions,
+            @RequestParam(required = false) Boolean questions, @RequestParam(required = false) Boolean things,
             @RequestParam(required = false) String characterSheet) {
         return generator.estimate(validated(extractor.extract(file)),
-                ComicOptions.of(supportLevel, feelingLabels, notes, questions), hasSheet(sheet(characterSheet)));
+                ComicOptions.of(supportLevel, feelingLabels, notes, questions, things), hasSheet(sheet(characterSheet)));
     }
 
     /** Runs the character pass, so the sheet can be reviewed and edited before drawing. */
@@ -95,9 +95,9 @@ public class ComicController {
     public ComicStoryResponse generateFromFile(@RequestParam("file") MultipartFile file,
             @RequestParam(required = false) Integer supportLevel,
             @RequestParam(required = false) Boolean feelingLabels, @RequestParam(required = false) Boolean notes,
-            @RequestParam(required = false) Boolean questions,
+            @RequestParam(required = false) Boolean questions, @RequestParam(required = false) Boolean things,
             @RequestParam(required = false) String characterSheet) {
-        return generate(extractor.extract(file), ComicOptions.of(supportLevel, feelingLabels, notes, questions),
+        return generate(extractor.extract(file), ComicOptions.of(supportLevel, feelingLabels, notes, questions, things),
                 sheet(characterSheet));
     }
 

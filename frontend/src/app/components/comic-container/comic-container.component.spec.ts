@@ -171,6 +171,7 @@ describe('ComicContainerComponent', () => {
       feelingLabels: true,
       notes: true,
       questions: false,
+      things: true,
       characterSheet: SHEET,
     });
 

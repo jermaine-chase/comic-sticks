@@ -16,6 +16,7 @@ import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.Facing;
 import com.comicsticks.dto.NoteDto;
 import com.comicsticks.dto.PanelDto;
+import com.comicsticks.dto.ThingDto;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.Scene;
 import com.comicsticks.exception.ComicGenerationException;
@@ -79,7 +80,19 @@ public class ComicStoryNormalizer {
 
         return new PanelDto(number, panel.scene() == null ? Scene.PLAIN : panel.scene(),
                 text(panel.caption()), characters, dialogue, panel.sourceText() == null ? "" : panel.sourceText(),
-                notes, text(panel.place()));
+                notes, text(panel.place()), things(panel.things(), characters));
+    }
+
+    /** Drops empty entries, and a holder who is not in the panel, so the thing goes on the ground. */
+    private static List<ThingDto> things(List<ThingDto> things, List<CharacterDto> characters) {
+        return listOf(things).stream()
+                .filter(t -> t != null && t.thing() != null)
+                .map(t -> new ThingDto(t.thing(), characters.stream()
+                        .map(CharacterDto::name)
+                        .filter(text(t.holder())::equalsIgnoreCase)
+                        .findFirst()
+                        .orElse("")))
+                .toList();
     }
 
     private static CharacterDto normalizeCharacter(CharacterDto c) {

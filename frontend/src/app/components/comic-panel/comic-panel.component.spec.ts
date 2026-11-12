@@ -116,4 +116,27 @@ describe('ComicPanelComponent', () => {
     expect(root.querySelector('app-panel-background')).toBeNull();
     expect(root.querySelector('.panel')!.classList).toContain('scene-outdoor');
   });
+
+  it('draws a held thing in its holder’s hand and the rest on the ground', async () => {
+    await render({
+      ...PANEL,
+      things: [
+        { thing: 'lamp', holder: 'Rat' },
+        { thing: 'dog', holder: '' },
+        { thing: 'tree', holder: 'Mole' },
+      ],
+    });
+
+    const [moleFigure, ratFigure] = Array.from(root.querySelectorAll('app-stick-figure'));
+    expect(ratFigure.querySelector('[data-held="lamp"]')).toBeTruthy();
+    expect(moleFigure.querySelector('[data-held]')).toBeNull();
+    const ground = Array.from(root.querySelectorAll('.stage app-thing'));
+    expect(ground.map((t) => t.getAttribute('data-thing'))).toEqual(['tree', 'dog']);
+    expect(ground[0].classList).toContain('behind');
+    expect(ground[1].querySelector('svg')!.getAttribute('aria-label')).toBe('A dog');
+  });
+
+  it('draws no things for an older comic that has none', () => {
+    expect(root.querySelectorAll('app-thing, [data-held]').length).toBe(0);
+  });
 });

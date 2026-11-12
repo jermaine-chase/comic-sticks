@@ -10,9 +10,9 @@ public final class TestProperties {
     private TestProperties() {
     }
 
-    /** Seconds: 2 per part, 3 per panel, 1 per notes call, 5 per character chunk, 4 for bookends, 3 for questions. */
+    /** Seconds: 2 per part, 3 per panel, 1 per notes call, 5 per character chunk, 4 for bookends, 3 for questions, 1 per things call. */
     public static ComicProperties.Llm llm(String baseUrl, String key) {
-        return new ComicProperties.Llm(baseUrl, key, "test-model", Duration.ofSeconds(5), 1000, 2, 3, 1, 5, 4, 3);
+        return new ComicProperties.Llm(baseUrl, key, "test-model", Duration.ofSeconds(5), 1000, 2, 3, 1, 5, 4, 3, 1);
     }
 
     public static ComicProperties.Story story(int maxPanels) {

@@ -1,5 +1,14 @@
-import { Dialogue, Facing, Panel, Pose } from '../../models/comic.models';
+import {
+  Dialogue,
+  Facing,
+  HELD_THINGS,
+  LARGE_THINGS,
+  Panel,
+  Pose,
+  Thing,
+} from '../../models/comic.models';
 import { SKELETONS } from '../stick-figure/stick-figure.poses';
+import { THING_ART } from '../things/things.drawings';
 
 /**
  * The fixed layout of every panel. The reader should never have to work out who is speaking:
@@ -226,6 +235,72 @@ export function bubblesOverflow(
 /** The next fit to try: one step further while text is cut off, else the same one. */
 export function nextFit(step: number, overflowing: boolean): number {
   return overflowing ? Math.min(step + 1, BUBBLE_FITS.length - 1) : step;
+}
+
+/** Whether a thing can be held. Large things and animals never are. */
+export function canBeHeld(thing: Thing): boolean {
+  return (HELD_THINGS as readonly string[]).includes(thing);
+}
+
+/** The things a character holds: in the front hand, then the back hand. Never more than two. */
+export function heldBy(panel: Pick<Panel, 'things'>, name: string): Thing[] {
+  return (panel.things ?? [])
+    .filter((t) => t.holder === name && canBeHeld(t.thing))
+    .map((t) => t.thing)
+    .slice(0, 2);
+}
+
+/**
+ * A thing on the ground or in the scenery.
+ *
+ * @param left   its centre, as a percentage of the panel's width
+ * @param width  as a percentage of the panel's width
+ * @param behind large things stand behind the figures; everything else stands in front
+ */
+export interface ThingSpot {
+  thing: Thing;
+  left: number;
+  width: number;
+  behind: boolean;
+}
+
+/** Where loose things may stand, in the order they are tried, so the result is predictable. */
+const GROUND_SPOTS = [6, 94, 50, 28, 72, 17, 83, 39, 61];
+
+/**
+ * Places the things nobody in the panel holds. Each goes in the spot that keeps it farthest from
+ * the figures and from the things already placed, so nothing hides a figure. Large things go
+ * first, so they get the edges, and stand behind the figures when there is no clear spot.
+ */
+export function groundThings(panel: Pick<Panel, 'characters' | 'things'>): ThingSpot[] {
+  const names = new Set(panel.characters.map((c) => c.name));
+  const isLarge = (thing: Thing) => (LARGE_THINGS as readonly string[]).includes(thing);
+  const loose = (panel.things ?? [])
+    .filter(
+      (t) =>
+        !(t.holder && names.has(t.holder) && canBeHeld(t.thing) && heldBy(panel, t.holder).includes(t.thing)),
+    )
+    .sort((a, b) => Number(isLarge(b.thing)) - Number(isLarge(a.thing)));
+  const figures = panel.characters.map((_, i, all) => slotCenter(i, all.length));
+  const placed: ThingSpot[] = [];
+  for (const { thing } of loose) {
+    const width = THING_ART[thing].size;
+    const behind = isLarge(thing);
+    let best = { left: 50, clearance: -Infinity };
+    for (const spot of GROUND_SPOTS) {
+      const left = clamp(spot, width / 2 + 2, 98 - width / 2);
+      const others = [
+        ...figures.map((f) => Math.abs(f - left) - width / 2),
+        ...placed.map((p) => Math.abs(p.left - left) - (p.width + width) / 2),
+      ];
+      const clearance = others.length ? Math.min(...others) : Infinity;
+      if (clearance > best.clearance) {
+        best = { left, clearance };
+      }
+    }
+    placed.push({ thing, left: round(best.left), width, behind });
+  }
+  return placed;
 }
 
 /** A short line joining a bubble to the next bubble from the same speaker. */

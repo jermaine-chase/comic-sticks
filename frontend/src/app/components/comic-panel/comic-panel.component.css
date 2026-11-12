@@ -242,6 +242,21 @@
   transform: translateX(-50%);
 }
 
+/*
+ * Objects and animals nobody holds stand on the ground line with the figures. Large ones (a tree,
+ * a door) stand behind the figures; small ones stand in front, in spots clear of them.
+ */
+.ground-thing {
+  position: absolute;
+  bottom: 1.9rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.ground-thing.behind {
+  bottom: 1.6rem;
+}
+
 .figure {
   width: min(100%, 6.5rem);
   aspect-ratio: 120 / 190;

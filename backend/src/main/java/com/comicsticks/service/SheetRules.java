@@ -23,6 +23,7 @@ import com.comicsticks.dto.Ears;
 import com.comicsticks.dto.Hair;
 import com.comicsticks.dto.Hat;
 import com.comicsticks.dto.PanelDto;
+import com.comicsticks.dto.ThingDto;
 import com.comicsticks.dto.PlaceDto;
 import com.comicsticks.dto.Snout;
 
@@ -149,8 +150,13 @@ public class SheetRules {
                             : new DialogueDto(sheetName(designs, d.speaker()), d.text(), d.type()))
                     .toList();
             String place = findPlace(clean.places(), panel.place()).map(PlaceDto::name).orElse("");
+            List<ThingDto> things = listOf(panel.things()).stream()
+                    .filter(Objects::nonNull)
+                    .map(t -> text(t.holder()).isEmpty() ? t
+                            : new ThingDto(t.thing(), find(designs, t.holder()).map(CharacterDesign::name).orElse("")))
+                    .toList();
             panels.add(new PanelDto(panel.panelNumber(), panel.scene(), panel.caption(), characters, dialogue,
-                    panel.sourceText(), panel.notes(), place));
+                    panel.sourceText(), panel.notes(), place, things));
         }
         return new ComicStoryResponse(story.title(), panels, designs, clean.places());
     }

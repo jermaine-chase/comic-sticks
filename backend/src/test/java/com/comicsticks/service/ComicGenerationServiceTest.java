@@ -37,6 +37,8 @@ import com.comicsticks.support.TestProperties;
 import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.SupportLevel;
+import com.comicsticks.dto.Thing;
+import com.comicsticks.dto.ThingDto;
 import com.comicsticks.exception.ComicGenerationException;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -52,6 +54,8 @@ class ComicGenerationServiceTest {
 
     /** Most tests leave notes off, so each part makes exactly one call. */
     private static final ComicOptions NO_NOTES = new ComicOptions(SupportLevel.PARAGRAPH, true, false);
+    private static final ComicOptions NOTES_ONLY = new ComicOptions(SupportLevel.PARAGRAPH, true, true, false, false);
+    private static final ComicOptions THINGS_ONLY = new ComicOptions(SupportLevel.PARAGRAPH, true, false, false, true);
 
     private MockRestServiceServer server;
     private ComicGenerationService service;
@@ -231,7 +235,7 @@ class ComicGenerationServiceTest {
                                   {"phrase":"over the moon","meaning":"Very happy."}]}""", "stop"),
                         MediaType.APPLICATION_JSON));
 
-        var panel = service.generate(text, ComicOptions.DEFAULTS, SHEET).panels().getFirst();
+        var panel = service.generate(text, NOTES_ONLY, SHEET).panels().getFirst();
 
         assertThat(panel.notes()).extracting(n -> n.phrase()).containsExactly("her heart sank");
         assertThat(panel.notes().getFirst().meaning()).isEqualTo("She felt very disappointed. Her heart did not move.");
@@ -239,10 +243,47 @@ class ComicGenerationServiceTest {
     }
 
     @Test
-    void estimateCountsTheNotesCallOnlyWhenNotesAreOn() {
+    void thingsComeFromASeparateSmallCallAndOnlyThingsTheTextNamesAreKept() {
+        String text = "Mia found the old map in the attic. A dog barked.";
+        reply(panelJson(MIA, ""));
+        server.expect(requestTo(LLM_URL))
+                .andExpect(jsonPath("$.response_format.json_schema.name").value("panel_things"))
+                .andExpect(jsonPath("$.messages[1].content").value(containsString("Characters in the panel: Mia.")))
+                .andExpect(jsonPath("$.response_format.json_schema.schema.properties.things.items.properties"
+                        + ".holder.enum").value(org.hamcrest.Matchers.contains("Mia", "")))
+                .andRespond(withSuccess(chatReply("""
+                        {"things":[{"thing":"map","holder":"mia"},{"thing":"sword","holder":"Mia"},
+                                   {"thing":"dog","holder":"Mia"},{"thing":"map","holder":""}]}""", "stop"),
+                        MediaType.APPLICATION_JSON));
+
+        var panel = service.generate(text, THINGS_ONLY, SHEET).panels().getFirst();
+
+        assertThat(panel.things()).containsExactly(
+                new ThingDto(Thing.MAP, "Mia"),
+                new ThingDto(Thing.DOG, ""));
+        server.verify();
+    }
+
+    @Test
+    void aFailedThingsCallJustMeansNoThings() {
+        reply(panelJson(MIA, ""));
+        server.expect(requestTo(LLM_URL)).andRespond(withSuccess(chatReply("not json", "stop"),
+                MediaType.APPLICATION_JSON));
+
+        var panel = service.generate("Mia found a map.", THINGS_ONLY, SHEET).panels().getFirst();
+
+        assertThat(panel.things()).isEmpty();
+        assertThat(panel.characters()).extracting(c -> c.name()).containsExactly("Mia");
+    }
+
+    @Test
+    void estimateCountsTheNotesAndThingsCallsOnlyWhenTheyAreOn() {
         String story = "Mia found the old map in the attic.\n\nLeo followed it to the cave.";
 
-        assertThat(service.estimate(story, ComicOptions.DEFAULTS, true).estimatedSeconds()).isEqualTo(2 * (2 + 1) + 2 * 3 + 4);
+        assertThat(service.estimate(story, ComicOptions.DEFAULTS, true).estimatedSeconds())
+                .isEqualTo(2 * (2 + 1 + 1) + 2 * 3 + 4);
+        assertThat(service.estimate(story, NOTES_ONLY, true).estimatedSeconds()).isEqualTo(2 * (2 + 1) + 2 * 3 + 4);
+        assertThat(service.estimate(story, THINGS_ONLY, true).estimatedSeconds()).isEqualTo(2 * (2 + 1) + 2 * 3 + 4);
         assertThat(service.estimate(story, NO_NOTES, true).estimatedSeconds()).isEqualTo(2 * 2 + 2 * 3 + 4);
         assertThat(service.estimate(story, new ComicOptions(SupportLevel.PARAGRAPH, true, false, true), true)
                 .estimatedSeconds()).as("questions add their call").isEqualTo(2 * 2 + 2 * 3 + 4 + 3);
