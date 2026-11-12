@@ -1,6 +1,8 @@
 @import '@fontsource/bangers/400.css';
 @import '@fontsource/comic-neue/400.css';
 @import '@fontsource/comic-neue/700.css';
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
 
 :root {
   --ink: #1b1b1f;
@@ -12,6 +14,7 @@
   --muted: #5d5a52;
   --font-display: 'Bangers', 'Impact', sans-serif;
   --font-comic: 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+  --font-reading: 'Atkinson Hyperlegible', 'Verdana', sans-serif;
 }
 
 *,

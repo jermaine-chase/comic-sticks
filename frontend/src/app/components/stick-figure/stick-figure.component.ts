@@ -1,6 +1,17 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, Input } from '@angular/core';
-import { Expression, Facing, Pose } from '../../models/comic.models';
-import { FACES, OPEN_MOUTH, SKELETONS, Skeleton } from './stick-figure.poses';
+import { CharacterDesign, Expression, Facing, Pose } from '../../models/comic.models';
+import { FeatureLayers, featureLayers } from './stick-figure.features';
+import {
+  EYE_PATHS,
+  Face,
+  FACES,
+  OPEN_MOUTH,
+  SKELETONS,
+  Skeleton,
+  SWEAT_PATH,
+  TEAR_PATH,
+} from './stick-figure.poses';
 
 const CANVAS_WIDTH = 120;
 const FACE_INK = '#1b1b1f';
@@ -8,6 +19,7 @@ const FACE_INK = '#1b1b1f';
 /** A posable stick figure on an inline SVG canvas. */
 @Component({
   selector: 'app-stick-figure',
+  imports: [NgTemplateOutlet],
   styles: `
     :host {
       display: block;
@@ -18,12 +30,17 @@ const FACE_INK = '#1b1b1f';
       height: 100%;
       overflow: visible;
     }
+    .symbol {
+      font:
+        700 30px/1 'Atkinson Hyperlegible',
+        sans-serif;
+    }
   `,
   template: `
     <svg viewBox="0 0 120 190" role="img" [attr.aria-label]="label">
       <g
         [attr.transform]="mirror"
-        [attr.stroke]="color"
+        [attr.stroke]="ink"
         fill="none"
         stroke-width="5"
         stroke-linecap="round"
@@ -35,29 +52,118 @@ const FACE_INK = '#1b1b1f';
         @if (skeleton.stool) {
           <path d="M34,142 H72 M42,142 L38,180 M64,142 L68,180" stroke="#8a6d3b" />
         }
+        <g class="features-back">
+          <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.back }" />
+        </g>
         <path [attr.d]="bodyPath" />
         <g [attr.transform]="headTransform">
+          <g class="features-head-back">
+            <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.headBack }" />
+          </g>
           <circle r="20" fill="#fffdf6" />
-          <g [attr.stroke]="faceInk" stroke-width="2.5">
-            @if (face.wideEyes) {
-              <circle cx="-6" cy="-4" r="4.5" fill="#fff" />
-              <circle cx="9" cy="-4" r="4.5" fill="#fff" />
-              <circle cx="-5" cy="-4" r="1.5" [attr.fill]="faceInk" stroke="none" />
-              <circle cx="10" cy="-4" r="1.5" [attr.fill]="faceInk" stroke="none" />
-            } @else {
-              <circle cx="-6" cy="-4" r="2.4" [attr.fill]="faceInk" stroke="none" />
-              <circle cx="9" cy="-4" r="2.4" [attr.fill]="faceInk" stroke="none" />
+          <g class="face" [attr.stroke]="faceInk" stroke-width="2.5">
+            @if (face.blush) {
+              <ellipse cx="-11" cy="5" rx="4.5" ry="2.5" fill="#f4a3b4" stroke="none" />
+              <ellipse cx="14" cy="5" rx="4.5" ry="2.5" fill="#f4a3b4" stroke="none" />
+            }
+            @switch (face.eyes ?? 'dot') {
+              @case ('wide') {
+                <circle cx="-6" cy="-4" r="5" fill="#fff" />
+                <circle cx="9" cy="-4" r="5" fill="#fff" />
+                <circle cx="-5" cy="-4" r="1.8" [attr.fill]="faceInk" stroke="none" />
+                <circle cx="10" cy="-4" r="1.8" [attr.fill]="faceInk" stroke="none" />
+              }
+              @case ('dot') {
+                <circle cx="-6" cy="-4" r="2.6" [attr.fill]="faceInk" stroke="none" />
+                <circle cx="9" cy="-4" r="2.6" [attr.fill]="faceInk" stroke="none" />
+              }
+              @default {
+                <path class="eyes" [attr.d]="eyePath" />
+              }
             }
             @if (face.brows) {
-              <path [attr.d]="face.brows" />
+              <path class="brows" [attr.d]="face.brows" stroke-width="3" />
             }
-            <path [attr.d]="mouth" [attr.fill]="mouthFill" />
-            @if (face.extra) {
-              <path [attr.d]="face.extra" fill="#6db9ee" stroke="none" />
+            <path class="mouth" [attr.d]="mouth" [attr.fill]="mouthFill" />
+            @if (face.tear) {
+              <path class="tear" [attr.d]="tearPath" fill="#6db9ee" stroke="none" />
+            }
+            @if (face.sweat) {
+              <path class="sweat" [attr.d]="sweatPath" fill="#6db9ee" stroke="none" />
+            }
+            @if (face.marks) {
+              <path class="marks" [attr.d]="face.marks" stroke-width="2.5" />
             }
           </g>
+          <g class="features-head-front">
+            <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.headFront }" />
+          </g>
+        </g>
+        <g class="features-front">
+          <ng-container *ngTemplateOutlet="shapes; context: { $implicit: features.front }" />
         </g>
       </g>
+      <ng-template #shapes let-list>
+        @for (shape of list; track $index) {
+          @switch (shape.kind) {
+            @case ('path') {
+              <path
+                [attr.data-feature]="shape.name"
+                [attr.d]="shape.d"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+            @case ('circle') {
+              <circle
+                [attr.data-feature]="shape.name"
+                [attr.cx]="shape.cx"
+                [attr.cy]="shape.cy"
+                [attr.r]="shape.r"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+            @case ('ellipse') {
+              <ellipse
+                [attr.data-feature]="shape.name"
+                [attr.cx]="shape.cx"
+                [attr.cy]="shape.cy"
+                [attr.rx]="shape.rx"
+                [attr.ry]="shape.ry"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+            @case ('rect') {
+              <rect
+                [attr.data-feature]="shape.name"
+                [attr.x]="shape.x"
+                [attr.y]="shape.y"
+                [attr.width]="shape.width"
+                [attr.height]="shape.height"
+                [attr.fill]="shape.fill"
+                [attr.stroke]="shape.stroke"
+                [attr.stroke-width]="shape.strokeWidth"
+              />
+            }
+          }
+        }
+      </ng-template>
+      @if (face.symbol) {
+        <text
+          class="symbol"
+          text-anchor="middle"
+          [attr.x]="symbolX"
+          [attr.y]="symbolY"
+          [attr.fill]="faceInk"
+        >
+          {{ face.symbol }}
+        </text>
+      }
     </svg>
   `,
 })
@@ -67,15 +173,32 @@ export class StickFigureComponent {
   @Input() facing: Facing = 'right';
   @Input() color = '#1b1b1f';
   @Input() name = 'Stick figure';
+  /** The character's fixed look from the sheet. Its colour wins over `color`. */
+  @Input() design: CharacterDesign | null = null;
+
+  protected get ink(): string {
+    return this.design?.color || this.color;
+  }
+
+  protected get features(): FeatureLayers {
+    return featureLayers(this.design, this.skeleton);
+  }
 
   protected readonly faceInk = FACE_INK;
+  protected readonly tearPath = TEAR_PATH;
+  protected readonly sweatPath = SWEAT_PATH;
 
   protected get skeleton(): Skeleton {
     return SKELETONS[this.pose] ?? SKELETONS.standing;
   }
 
-  protected get face() {
+  protected get face(): Face {
     return FACES[this.expression] ?? FACES.neutral;
+  }
+
+  protected get eyePath(): string {
+    const eyes = this.face.eyes;
+    return eyes === 'happy' || eyes === 'closed' || eyes === 'half' ? EYE_PATHS[eyes] : '';
   }
 
   protected get label(): string {
@@ -89,6 +212,16 @@ export class StickFigureComponent {
   protected get headTransform(): string {
     const [x, y] = this.skeleton.head;
     return `translate(${x},${y})`;
+  }
+
+  /** Above the head, on the side the figure faces, and never mirrored so it stays readable. */
+  protected get symbolX(): number {
+    const x = this.skeleton.head[0] + 22;
+    return this.facing === 'left' ? CANVAS_WIDTH - x : x;
+  }
+
+  protected get symbolY(): number {
+    return this.skeleton.head[1] - 18;
   }
 
   protected get bodyPath(): string {
@@ -109,6 +242,6 @@ export class StickFigureComponent {
   }
 
   protected get mouthFill(): string {
-    return this.skeleton.openMouth ? FACE_INK : 'none';
+    return this.skeleton.openMouth || this.face.filledMouth ? FACE_INK : 'none';
   }
 }

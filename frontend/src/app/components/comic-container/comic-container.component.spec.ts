@@ -1,7 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ComicEstimate, ComicStory } from '../../models/comic.models';
+import {
+  CharacterDesign,
+  CharacterSheet,
+  ComicEstimate,
+  ComicStory,
+} from '../../models/comic.models';
 import { ComicContainerComponent } from './comic-container.component';
 
 const STORY: ComicStory = {
@@ -12,20 +17,83 @@ const STORY: ComicStory = {
       scene: 'indoor',
       caption: 'In the attic.',
       characters: [
-        { name: 'Mia', pose: 'pointing', expression: 'surprised', facing: 'right' },
-        { name: 'Leo', pose: 'standing', expression: 'neutral', facing: 'left' },
+        {
+          name: 'Mia',
+          pose: 'pointing',
+          expression: 'surprised',
+          facing: 'right',
+          feeling: 'surprised',
+        },
+        { name: 'Leo', pose: 'standing', expression: 'neutral', facing: 'left', feeling: '' },
       ],
       dialogue: [{ speaker: 'Mia', text: '<b>Look!</b>', type: 'shout' }],
+      sourceText: '',
+      notes: [],
+      place: '',
     },
     {
       panelNumber: 2,
       scene: 'plain',
       caption: '',
-      characters: [{ name: 'Leo', pose: 'thinking', expression: 'confused', facing: 'right' }],
+      characters: [
+        {
+          name: 'Leo',
+          pose: 'thinking',
+          expression: 'confused',
+          facing: 'right',
+          feeling: 'confused',
+        },
+      ],
       dialogue: [{ speaker: 'Leo', text: 'Hmm.', type: 'thought' }],
+      sourceText: 'Mia pointed.\n"<b>Look!</b>" she shouted. Leo wondered.',
+      notes: [{ phrase: 'Leo wondered', meaning: 'Leo was not sure, and thought about it.' }],
+      place: 'The attic',
     },
   ],
+  characters: [],
+  places: [{ name: 'The attic', description: 'A dusty room.', background: 'room' }],
+  bookends: {
+    whosWho: { characters: ['Mia', 'Leo'], whereWeAre: 'We are in the attic.' },
+    recap: [
+      { sentence: 'Mia found a map.', panelNumber: 2, character: null, expression: null },
+      {
+        sentence: 'At the end, Mia feels surprised.',
+        panelNumber: null,
+        character: 'Mia',
+        expression: 'surprised',
+      },
+    ],
+    questions: [
+      {
+        question: 'Who shouted?',
+        choices: [
+          { character: 'Leo', panelNumber: null },
+          { character: 'Mia', panelNumber: null },
+        ],
+        answerIndex: 1,
+      },
+    ],
+  },
 };
+
+const MIA: CharacterDesign = {
+  name: 'Mia',
+  description: 'Mia: a girl who loves maps.',
+  kind: 'person',
+  color: '#c8321f',
+  hat: 'cap',
+  hair: 'none',
+  accessory: 'glasses',
+  ears: 'none',
+  tail: 'none',
+  snout: 'none',
+  added: false,
+};
+const SHEET: CharacterSheet = {
+  characters: [MIA, { ...MIA, name: 'Leo', color: '#1f5fbf', hat: 'none', hair: 'curly' }],
+  places: STORY.places,
+};
+STORY.characters = SHEET.characters;
 
 const ESTIMATE: ComicEstimate = { parts: 3, panels: 8, estimatedSeconds: 41 };
 
@@ -69,8 +137,16 @@ describe('ComicContainerComponent', () => {
     button!.click();
   }
 
-  async function submitStory() {
+  /** Confirms the estimate and answers the character pass, stopping at the sheet review. */
+  async function reachSheet() {
     await reachConfirmation();
+    clickButton('Find the characters');
+    http.expectOne('/api/comics/characters').flush(SHEET);
+    await fixture.whenStable();
+  }
+
+  async function submitStory() {
+    await reachSheet();
     clickButton('Start drawing');
     return http.expectOne('/api/comics/generate');
   }
@@ -89,16 +165,35 @@ describe('ComicContainerComponent', () => {
   it('posts the story and renders every panel', async () => {
     const request = await submitStory();
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ text: 'Mia found a map.' });
+    expect(request.request.body).toEqual({
+      text: 'Mia found a map.',
+      supportLevel: 1,
+      feelingLabels: true,
+      notes: true,
+      questions: false,
+      characterSheet: SHEET,
+    });
 
     request.flush(STORY);
     await fixture.whenStable();
 
     expect(root.querySelector('.comic-grid')).toBeTruthy();
     expect(root.querySelectorAll('.panel').length).toBe(2);
-    expect(root.querySelectorAll('app-stick-figure').length).toBe(3);
+    expect(root.querySelectorAll('.panel app-stick-figure').length).toBe(3);
     expect(root.querySelector('.bubble-shout')).toBeTruthy();
     expect(root.querySelector('.bubble-thought')).toBeTruthy();
+  });
+
+  it('opens the chapter with who is who and closes it with what happened and questions', async () => {
+    await renderStory();
+
+    const grid = root.querySelector('.comic-grid')!;
+    expect(grid.firstElementChild!.tagName.toLowerCase()).toBe('app-whos-who');
+    expect(grid.querySelector('app-whos-who')!.textContent).toContain('We are in the attic.');
+    const recap = root.querySelector('app-recap')!;
+    expect(recap.textContent).toContain('At the end, Mia feels surprised.');
+    expect(recap.querySelector('app-panel-thumbnail')).toBeTruthy();
+    expect(root.querySelector('app-questions')!.textContent).toContain('Who shouted?');
   });
 
   it('shows the estimate and calls nothing further until confirmed', async () => {
@@ -109,6 +204,34 @@ describe('ComicContainerComponent', () => {
     expect(confirm).toContain('3 parts');
     expect(confirm).toContain('up to 8 panels');
     http.expectNone('/api/comics/generate');
+  });
+
+  it('sends the chosen support level and drops a stale estimate when it changes', async () => {
+    await reachConfirmation();
+    const levelTwo = root.querySelector<HTMLInputElement>(
+      'input[name="support-level"][value="2"]',
+    )!;
+
+    levelTwo.click();
+    await fixture.whenStable();
+    expect(root.querySelector('.confirm')).toBeNull();
+
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const request = http.expectOne('/api/comics/estimate');
+    expect(request.request.body).toMatchObject({ text: 'Mia found a map.', supportLevel: 2 });
+    request.flush(ESTIMATE);
+  });
+
+  it('sends the feeling and notes toggles so the server can skip that work', async () => {
+    await typeStory('Mia found a map.');
+    root.querySelector<HTMLInputElement>('input[name="feeling-labels"]')!.click();
+    root.querySelector<HTMLInputElement>('input[name="notes"]')!.click();
+    await fixture.whenStable();
+
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const request = http.expectOne('/api/comics/estimate');
+    expect(request.request.body).toMatchObject({ feelingLabels: false, notes: false });
+    request.flush(ESTIMATE);
   });
 
   it('cancelling goes back without generating', async () => {
@@ -139,6 +262,17 @@ describe('ComicContainerComponent', () => {
     await fixture.whenStable();
     expect(root.querySelector('.loading')).toBeNull();
     expect(root.querySelector('.confirm')).toBeNull();
+  });
+
+  it('shows the exact source text once, under the last panel of its part', async () => {
+    await renderStory();
+
+    const blocks = root.querySelectorAll('.panel-block');
+    expect(blocks[0].querySelector('.source-text')).toBeNull();
+    const source = blocks[1].querySelector<HTMLElement>('.source-text')!;
+    expect(source.textContent).toBe('Mia pointed.\n"<b>Look!</b>" she shouted. Leo wondered.');
+    expect(source.querySelector('b')).toBeNull();
+    expect(source.hasAttribute('contenteditable')).toBe(false);
   });
 
   it('shows story markup as literal text', async () => {
@@ -186,7 +320,7 @@ describe('ComicContainerComponent', () => {
     select.dispatchEvent(new Event('change'));
     await fixture.whenStable();
 
-    expect(root.querySelector('svg')!.getAttribute('aria-label')).toBe(
+    expect(root.querySelector('.panel app-stick-figure svg')!.getAttribute('aria-label')).toBe(
       'Mia, running, looking surprised',
     );
   });

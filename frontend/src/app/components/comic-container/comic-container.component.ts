@@ -3,13 +3,15 @@ import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import {
+  CharacterSheet,
   ComicCharacter,
   ComicEstimate,
+  ComicOptions,
   ComicStory,
-  Dialogue,
-  EXPRESSIONS,
+  DEFAULT_OPTIONS,
   Panel,
-  POSES,
+  SUPPORT_LEVELS,
+  SupportLevel,
 } from '../../models/comic.models';
 import {
   ComicApiService,
@@ -18,14 +20,14 @@ import {
   StorySource,
 } from '../../services/comic-api.service';
 import { EditableTextDirective } from '../../directives/editable-text.directive';
+import { CharacterSheetComponent } from '../character-sheet/character-sheet.component';
+import { QuestionsComponent } from '../bookends/questions.component';
+import { RecapComponent } from '../bookends/recap.component';
+import { WhosWhoComponent } from '../bookends/whos-who.component';
+import { ComicPanelComponent } from '../comic-panel/comic-panel.component';
 import { StickFigureComponent } from '../stick-figure/stick-figure.component';
 
 const CAST_COLORS = ['#1b1b1f', '#c8321f', '#1f5fbf', '#1c8a4a', '#8a3fb8', '#b85f00'];
-
-/** Bubble width as a share of the panel, by the number of figures in it. */
-const BUBBLE_WIDTHS = [80, 80, 66, 58, 54];
-
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 function describeDuration(seconds: number): string {
   if (seconds < 10) {
@@ -39,7 +41,15 @@ function describeDuration(seconds: number): string {
 
 @Component({
   selector: 'app-comic-container',
-  imports: [StickFigureComponent, EditableTextDirective],
+  imports: [
+    StickFigureComponent,
+    EditableTextDirective,
+    ComicPanelComponent,
+    WhosWhoComponent,
+    RecapComponent,
+    QuestionsComponent,
+    CharacterSheetComponent,
+  ],
   templateUrl: './comic-container.component.html',
   styleUrl: './comic-container.component.css',
 })
@@ -47,15 +57,27 @@ export class ComicContainerComponent {
   private readonly api = inject(ComicApiService);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly poses = POSES;
-  protected readonly expressions = EXPRESSIONS;
-
   protected readonly storyText = signal('');
   protected readonly file = signal<File | null>(null);
   protected readonly story = signal<ComicStory | null>(null);
   protected readonly checking = signal(false);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly finding = signal(false);
+  /** The character sheet, from the character pass, while it is reviewed. */
+  protected readonly sheet = signal<CharacterSheet | null>(null);
+
+  protected readonly supportLevels = SUPPORT_LEVELS;
+  protected readonly supportLevel = signal<SupportLevel>(DEFAULT_OPTIONS.supportLevel);
+  protected readonly feelingLabels = signal(DEFAULT_OPTIONS.feelingLabels);
+  protected readonly notes = signal(DEFAULT_OPTIONS.notes);
+  protected readonly questions = signal(DEFAULT_OPTIONS.questions);
+  private readonly options = computed<ComicOptions>(() => ({
+    supportLevel: this.supportLevel(),
+    feelingLabels: this.feelingLabels(),
+    notes: this.notes(),
+    questions: this.questions(),
+  }));
 
   /** Set between checking the run time and the user's decision, and during the run itself. */
   protected readonly estimate = signal<ComicEstimate | null>(null);
@@ -72,9 +94,15 @@ export class ComicContainerComponent {
     describeDuration(this.estimate()?.estimatedSeconds ?? 0),
   );
 
-  /** Each character keeps one colour across the comic, assigned by first appearance. */
+  /**
+   * Each character keeps one colour across the comic: the sheet's colour, or for anyone not on
+   * it, one assigned by first appearance.
+   */
   private readonly castColors = computed(() => {
     const colors = new Map<string, string>();
+    for (const design of this.story()?.characters ?? []) {
+      colors.set(design.name, design.color);
+    }
     for (const panel of this.story()?.panels ?? []) {
       for (const { name } of panel.characters) {
         if (!colors.has(name)) {
@@ -94,18 +122,34 @@ export class ComicContainerComponent {
     }
     this.error.set(null);
     this.estimate.set(null);
+    this.sheet.set(null);
     this.file.set(file);
   }
 
   protected removeFile(input: HTMLInputElement): void {
     input.value = '';
     this.estimate.set(null);
+    this.sheet.set(null);
     this.file.set(null);
   }
 
+  /** A different story has different characters, so the sheet is found again. */
   protected onStoryInput(text: string): void {
     this.estimate.set(null);
+    this.sheet.set(null);
     this.storyText.set(text);
+  }
+
+  /** A different level splits the text differently, so any estimate is out of date. */
+  protected setSupportLevel(level: SupportLevel): void {
+    this.estimate.set(null);
+    this.supportLevel.set(level);
+  }
+
+  /** The toggles change which LLM calls run, so any estimate is out of date. */
+  protected setToggle(toggle: 'feelingLabels' | 'notes' | 'questions', on: boolean): void {
+    this.estimate.set(null);
+    this[toggle].set(on);
   }
 
   /** First step: shows the expected run time. Nothing is sent to the LLM until it is accepted. */
@@ -116,7 +160,7 @@ export class ComicContainerComponent {
     this.checking.set(true);
     this.error.set(null);
     this.api
-      .estimate(this.storySource())
+      .estimate(this.storySource(), this.options())
       .pipe(
         finalize(() => this.checking.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -129,13 +173,31 @@ export class ComicContainerComponent {
 
   protected cancelEstimate(): void {
     this.estimate.set(null);
+    this.sheet.set(null);
   }
 
+  /** Second step: the character pass, whose sheet is shown for review before drawing. */
+  protected findCharacters(): void {
+    this.finding.set(true);
+    this.error.set(null);
+    this.api
+      .characters(this.storySource())
+      .pipe(
+        finalize(() => this.finding.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (sheet) => this.sheet.set(sheet),
+        error: (e: HttpErrorResponse) => this.error.set(errorMessage(e)),
+      });
+  }
+
+  /** Last step: draws every panel from the reviewed sheet. */
   protected generate(): void {
     this.loading.set(true);
     this.error.set(null);
     this.api
-      .generate(this.storySource())
+      .generate(this.storySource(), this.options(), this.sheet())
       .pipe(
         finalize(() => {
           this.loading.set(false);
@@ -144,7 +206,10 @@ export class ComicContainerComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: (story) => this.story.set(story),
+        next: (story) => {
+          this.story.set(story);
+          this.sheet.set(null);
+        },
         error: (e: HttpErrorResponse) => this.error.set(errorMessage(e)),
       });
   }
@@ -153,20 +218,8 @@ export class ComicContainerComponent {
     return this.file() ?? this.storyText();
   }
 
-  protected colorOf(name: string): string {
-    return this.castColors().get(name) ?? CAST_COLORS[0];
-  }
-
-  /** Places a bubble over its speaker's column, keeping it inside the panel. */
-  protected bubbleLayout(panel: Panel, line: Dialogue) {
-    const count = Math.max(panel.characters.length, 1);
-    const index = Math.max(panel.characters.findIndex((c) => c.name === line.speaker), 0);
-    const speakerCenter = ((index + 0.5) / count) * 100;
-    const width = BUBBLE_WIDTHS[count] ?? BUBBLE_WIDTHS.at(-1)!;
-    const left = clamp(speakerCenter - width / 2, 0, 100 - width);
-    const tail = clamp(((speakerCenter - left) / width) * 100, 12, 88);
-    return { left, width, tail: `${tail}%` };
-  }
+  protected readonly colorFn = (name: string): string =>
+    this.castColors().get(name) ?? CAST_COLORS[0];
 
   protected setTitle(title: string): void {
     this.story.update((story) => story && { ...story, title });

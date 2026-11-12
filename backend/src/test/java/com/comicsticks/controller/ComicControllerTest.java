@@ -1,6 +1,8 @@
 package com.comicsticks.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,7 +43,10 @@ class ComicControllerTest {
                 .andExpect(jsonPath("$.panels[0].panelNumber").value(1))
                 .andExpect(jsonPath("$.panels[0].characters[0].name").value("Mia"))
                 .andExpect(jsonPath("$.panels[0].characters[0].pose").value("standing"))
-                .andExpect(jsonPath("$.panels[1].dialogue[0].type").value("shout"));
+                .andExpect(jsonPath("$.panels[0].sourceText").value(""))
+                // A two-sentence ending gets two panels, with its text under the last.
+                .andExpect(jsonPath("$.panels[1].dialogue[0].type").value("shout"))
+                .andExpect(jsonPath("$.panels[1].sourceText").value("Mia waved. \"Hello there!\" she said."));
     }
 
     @Test
@@ -53,6 +58,83 @@ class ComicControllerTest {
                 .andExpect(jsonPath("$.panels").value(2))
                 .andExpect(jsonPath("$.parts").value(1))
                 .andExpect(jsonPath("$.estimatedSeconds").value(1));
+    }
+
+    @Test
+    void supportLevelChangesHowTextIsGrouped() throws Exception {
+        String story = "Mia ran.\\n\\nLeo hid.\\n\\nMia found him.\\n\\nThey laughed.";
+        mvc.perform(post("/api/comics/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\"}"))
+                .andExpect(jsonPath("$.parts").value(4));
+        mvc.perform(post("/api/comics/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\",\"supportLevel\":2}"))
+                .andExpect(jsonPath("$.parts").value(1));
+        var file = new MockMultipartFile("file", "story.txt", "text/plain",
+                story.replace("\\n", "\n").getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/comics/generate").file(file).param("supportLevel", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.panels.length()").value(2))
+                .andExpect(jsonPath("$.panels[1].sourceText").value(story.replace("\\n", "\n")));
+    }
+
+    @Test
+    void findsTheCharacterSheetAndDrawsFromAnEditedOne() throws Exception {
+        String story = "Mole met Ratty by the river. \\\"Hello!\\\" said Mole. Ratty waved.";
+        mvc.perform(post("/api/comics/characters")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.characters[0].name").value("Mole"))
+                .andExpect(jsonPath("$.characters[0].kind").value("animal"))
+                .andExpect(jsonPath("$.places[0].background").value("riverbank"));
+
+        String edited = """
+                {"characters":[{"name":"Mole","description":"Mole: shy.","kind":"animal","color":"#123456",
+                  "hat":"top_hat","hair":"none","accessory":"none","ears":"round","tail":"short","snout":"short"}],
+                 "places":[]}""";
+        mvc.perform(post("/api/comics/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\",\"characterSheet\":" + edited + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.characters[0].hat").value("top_hat"))
+                .andExpect(jsonPath("$.characters[0].color").value("#123456"))
+                .andExpect(jsonPath("$.panels[0].characters[0].name").value("Mole"));
+        var file = new MockMultipartFile("file", "story.txt", "text/plain",
+                story.replace("\\\"", "\"").getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/comics/generate").file(file).param("characterSheet", edited))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.characters[0].hat").value("top_hat"));
+    }
+
+    @Test
+    void endsEveryComicWithBookendsAndAddsQuestionsWhenAsked() throws Exception {
+        String story = "Mole met Ratty by the river. \\\"Hello!\\\" said Mole.\\n\\nRatty waved back.\\n\\n"
+                + "They rowed home.";
+        mvc.perform(post("/api/comics/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"" + story + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookends.whosWho.characters[0]").value("Mole"))
+                .andExpect(jsonPath("$.bookends.whosWho.whereWeAre").value("We are at the river bank."))
+                .andExpect(jsonPath("$.bookends.recap[*].sentence", hasItem(startsWith("At the end, "))))
+                .andExpect(jsonPath("$.bookends.questions").isEmpty());
+        var file = new MockMultipartFile("file", "story.txt", "text/plain",
+                story.replace("\\n", "\n").replace("\\\"", "\"").getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/comics/generate").file(file).param("questions", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookends.questions[0].question").value("Who said \"Hello!\"?"))
+                .andExpect(jsonPath("$.bookends.questions[0].choices[0].character").value("Mole"));
+    }
+
+    @Test
+    void anUnknownSupportLevelIsRejected() throws Exception {
+        mvc.perform(post("/api/comics/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Mia ran.\",\"supportLevel\":7}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("The support level must be 1, 2 or 3."));
     }
 
     @Test
@@ -79,7 +161,7 @@ class ComicControllerTest {
 
         mvc.perform(multipart("/api/comics/generate").file(file))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.panels[0].caption").value("Mia ran home."));
+                .andExpect(jsonPath("$.panels[0].sourceText").value("Mia ran home."));
     }
 
     @Test
@@ -88,7 +170,7 @@ class ComicControllerTest {
 
         mvc.perform(multipart("/api/comics/generate").file(file))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.panels[0].caption").value("Mia ran home."));
+                .andExpect(jsonPath("$.panels[0].sourceText").value("Mia ran home."));
     }
 
     @Test

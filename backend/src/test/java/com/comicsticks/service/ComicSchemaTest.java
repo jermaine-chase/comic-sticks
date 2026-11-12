@@ -37,4 +37,41 @@ class ComicSchemaTest {
     void capsPanelsAtTheConfiguredLimit() {
         assertThat(panelsArray()).containsEntry("maxItems", 12);
     }
+
+    private static Map<String, Object> itemProperties(Map<String, Object> panelProperties, String array) {
+        return child(child(child(panelProperties, array), "items"), "properties");
+    }
+
+    @Test
+    void asksForTheFeelingBeforeTheFaceAndTheBubbleTypeBeforeTheWords() {
+        assertThat(itemProperties(panelProperties(), "characters").keySet())
+                .containsExactly("name", "feeling", "expression", "pose", "facing");
+        assertThat(itemProperties(panelProperties(), "dialogue").keySet()).containsExactly("speaker", "type", "text");
+    }
+
+    @Test
+    void leavesFeelingsOutWhenTheyAreOff() {
+        var panel = child(child(child(child(ComicSchema.story(1, false, java.util.List.of()), "properties"), "panels"), "items"),
+                "properties");
+
+        var character = child(child(panel, "characters"), "items");
+        assertThat(child(character, "properties").keySet()).doesNotContain("feeling");
+        assertThat(character.get("required")).asList().doesNotContain("feeling");
+    }
+
+    @Test
+    void offersEveryDialogueTypeIncludingWhisperAndThought() {
+        assertThat(child(itemProperties(panelProperties(), "dialogue"), "type").get("enum")).asList()
+                .containsExactly("speech", "thought", "shout", "whisper");
+    }
+
+    @Test
+    void notesSchemaIsSmallAndStrict() {
+        Map<String, Object> notes = ComicSchema.notes(3);
+
+        assertThat(notes).containsEntry("additionalProperties", false);
+        assertThat(child(child(notes, "properties"), "notes")).containsEntry("maxItems", 3).containsEntry("minItems", 0);
+        assertThat(child(child(child(notes, "properties"), "notes"), "items").get("required")).asList()
+                .containsExactly("phrase", "meaning");
+    }
 }

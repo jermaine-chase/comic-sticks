@@ -11,5 +11,11 @@ public enum Expression {
     @JsonProperty("angry") ANGRY,
     @JsonProperty("surprised") SURPRISED,
     @JsonProperty("scared") SCARED,
-    @JsonProperty("confused") CONFUSED
+    @JsonProperty("confused") CONFUSED,
+    @JsonProperty("worried") WORRIED,
+    @JsonProperty("excited") EXCITED,
+    @JsonProperty("proud") PROUD,
+    @JsonProperty("embarrassed") EMBARRASSED,
+    @JsonProperty("determined") DETERMINED,
+    @JsonProperty("tired") TIRED
 }

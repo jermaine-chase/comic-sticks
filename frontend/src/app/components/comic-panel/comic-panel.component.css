@@ -1,0 +1,324 @@
+:host {
+  display: block;
+  --ink: #1b1b1f;
+  --font-reading: 'Atkinson Hyperlegible', 'Verdana', sans-serif;
+}
+
+.panel-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+/* Every panel is the same square, whatever is in it. */
+.panel {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #fff;
+  border: 4px solid var(--ink);
+}
+
+/* Plain, quiet backgrounds: a floor line and a hint of the setting, nothing to search through. */
+.scene-indoor {
+  background: linear-gradient(#fbf3e2 0 78%, #e2c9a0 78%);
+}
+
+.scene-outdoor {
+  background: linear-gradient(#dff1ff 0 78%, #bfe3a8 78%);
+}
+
+.scene-night {
+  background: linear-gradient(#c9c7ec 0 78%, #a3a7c7 78%);
+}
+
+.scene-plain {
+  background: linear-gradient(#fff 0 78%, #ececec 78%);
+}
+
+/* Editable text */
+
+[contenteditable] {
+  cursor: text;
+  outline: 2px dashed transparent;
+  outline-offset: 2px;
+}
+
+[contenteditable]:hover {
+  outline-color: #00000040;
+}
+
+[contenteditable]:focus {
+  outline-color: #e5352b;
+}
+
+/* Scene-change caption: a box across the top. */
+
+.caption {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  max-width: 80%;
+  margin: 0;
+  padding: 0.3rem 0.7rem;
+  font: 700 1.05rem / 1.25 var(--font-reading);
+  background: #ffd23f;
+  border: 0 solid var(--ink);
+  border-width: 0 3px 3px 0;
+}
+
+.caption:empty {
+  opacity: 0;
+}
+
+.caption:empty::before {
+  content: 'Add a scene change';
+  font-weight: 400;
+}
+
+.panel:hover .caption:empty,
+.caption:empty:focus {
+  opacity: 0.7;
+}
+
+/* Bubbles, in reading order from the top. */
+
+.bubbles {
+  position: absolute;
+  inset: 2.6rem 0.6rem 50% 0.6rem;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1.3rem;
+}
+
+.bubble {
+  position: relative;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  font: 700 1.15rem / 1.25 var(--font-reading);
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: 1.1rem;
+}
+
+.bubble:empty::before {
+  content: '...';
+  color: #5d5a52;
+}
+
+/* Shouting is the only lettering in capitals. */
+.bubble-shout {
+  font:
+    400 1.35rem / 1.1 'Bangers',
+    'Impact',
+    sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #fff3b8;
+  border-width: 4px;
+  border-radius: 0.3rem;
+}
+
+/* A whisper is a speech bubble with a dashed outline and its own small label. */
+.bubble-whisper {
+  font-weight: 400;
+  border-style: dashed;
+}
+
+.bubble-whisper::before {
+  content: attr(data-type-label);
+  position: absolute;
+  top: -0.75rem;
+  left: 0.6rem;
+  padding: 0 0.3rem;
+  color: #5d5a52;
+  font: 700 0.7rem / 1.2 var(--font-reading);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #fff;
+}
+
+/* A thought is a cloud, never a speech shape, and links to the head with circles. */
+.bubble-thought {
+  padding: 0.9rem 1.3rem;
+  font-weight: 400;
+  font-style: italic;
+  background: no-repeat center / 100% 100%
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 224 124' preserveAspectRatio='none'%3E%3Cpath d='M30,80 a20,20 0 0 1 0,-40 a25,25 0 0 1 40,-25 a35,35 0 0 1 55,-5 a25,25 0 0 1 45,20 a20,20 0 0 1 0,45 a25,25 0 0 1 -40,15 a35,35 0 0 1 -55,0 a25,25 0 0 1 -45,-10 Z' fill='white' stroke='%231b1b1f' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  border: 0;
+  border-radius: 0;
+}
+
+/* Tails sit above the bubbles: their white fill hides the bubble's edge where they join it. */
+.tails {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.tail {
+  fill: #fff;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.tail-shout {
+  fill: #fff3b8;
+  stroke-width: 3.5;
+}
+
+.tail-whisper {
+  stroke-dasharray: 5 4;
+}
+
+.thought-dot {
+  fill: #fff;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.connector {
+  stroke: var(--ink);
+  stroke-width: 6;
+}
+
+/* Figures stand in fixed slots along the bottom. */
+
+.stage {
+  position: absolute;
+  inset: 50% 0 0 0;
+}
+
+.actor {
+  position: absolute;
+  bottom: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 25%;
+  transform: translateX(-50%);
+}
+
+.figure {
+  width: min(100%, 6.5rem);
+  aspect-ratio: 120 / 190;
+}
+
+.actor-name {
+  max-width: 100%;
+  padding: 0 0.3rem;
+  font: 700 0.95rem / 1.2 var(--font-reading);
+  overflow-wrap: anywhere;
+  text-align: center;
+  background: #ffffffd9;
+  border-radius: 0.3rem;
+}
+
+/* A feeling is a label, not speech: a dashed pill in a soft colour with no tail. */
+.feeling {
+  margin-top: 0.15rem;
+  padding: 0 0.45rem;
+  color: #3a2a6b;
+  font: 700 0.85rem / 1.35 var(--font-reading);
+  background: #ece6ff;
+  border: 2px dashed #6b55b8;
+  border-radius: 999px;
+}
+
+.actor-controls {
+  position: absolute;
+  bottom: 2.6rem;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(100%, 6.5rem);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.12s;
+}
+
+.actor:hover .actor-controls,
+.actor-controls:focus-within {
+  opacity: 1;
+}
+
+.actor-controls select {
+  width: 100%;
+  font: 700 0.78rem var(--font-reading);
+  background: #fff;
+  border: 1.5px solid var(--ink);
+}
+
+@media (hover: none) {
+  .actor-controls {
+    position: static;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The book's own words, plain and large, then what any tricky phrases mean. */
+
+.text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.source-text {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  font: 1.25rem / 1.6 var(--font-reading);
+  white-space: pre-line;
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
+.notes {
+  padding: 0.5rem 0.9rem;
+  background: #f1f8ee;
+  border: 2px solid #3f7d3a;
+  border-radius: 0.4rem;
+}
+
+.notes-title {
+  margin: 0 0 0.3rem;
+  color: #2c5a29;
+  font: 700 1rem var(--font-reading);
+}
+
+.notes dl {
+  margin: 0;
+}
+
+.note + .note {
+  margin-top: 0.35rem;
+}
+
+.note dt {
+  font: 700 1.05rem / 1.4 var(--font-reading);
+}
+
+.note dd {
+  margin: 0;
+  font: 1.05rem / 1.45 var(--font-reading);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actor-controls {
+    transition: none;
+  }
+}

@@ -26,8 +26,10 @@ cd backend
 mvn spring-boot:run
 ```
 
-To try the app without any LLM, use the demo profile instead. It splits the text by sentence
-with simple rules, so its comics are much cruder than an LLM's:
+To try the app without any LLM, use the demo profile instead. It splits the text the same way, but
+fills every field with simple rules (quoted text becomes speech, feeling words become feelings, a
+short list of idioms becomes notes, capitalized names become characters), so its comics are much
+cruder than an LLM's:
 
 ```powershell
 mvn spring-boot:run "-Dspring-boot.run.profiles=demo"
@@ -58,23 +60,84 @@ Ollama server, so no environment variables are needed. Override these to use som
 
 The provider and model must support `response_format` with a strict `json_schema`.
 `backend/src/main/resources/application.properties` has OpenAI and Gemini examples, along with the
-timeout, upload and story length limits.
+timeout and upload limits, the run time estimate (`comic.llm.seconds-*`), the support levels
+(`comic.story.*`), the character pass (`comic.characters.*`) and the chapter bookends
+(`comic.bookends.*`).
 
 ## How a story becomes a comic
 
 1. `POST /api/comics/estimate` splits the story and predicts the run time, without calling the LLM.
    The UI shows this and waits for the user to confirm.
-2. `POST /api/comics/generate` sends the story to the LLM one part at a time, in order, and joins
-   the panels. Each part is told the character names found so far.
+2. `POST /api/comics/characters` runs the character pass: the story is read in chunks of
+   `comic.characters.chunk-chars`, one small call each, to find the main characters and places.
+   Each character gets a fixed design (person or animal, 1 to 2 of hat, hair and accessory, and
+   ears, tail and snout for animals) and each place a background preset. The UI shows this
+   character sheet for review and editing.
+3. `POST /api/comics/generate` sends the story to the LLM one part at a time, in order, and joins
+   the panels. Every part is given the sheet, and every figure is drawn from it by name, so a
+   character looks the same in every panel. Anyone a panel names who is not on the sheet gets a
+   plain design marked `added`. Without a `characterSheet`, generate runs the character pass
+   itself.
+4. Generate then writes the chapter's bookends (see below): the opening "Who's who", the closing
+   "What happened" and, if asked for, the questions.
 
-Each paragraph is a part, with these adjustments (see `StorySegmenter`):
+Each part becomes one panel, and the story's own words for that part appear, exactly as written,
+under the panel (`sourceText`). The LLM never writes or rewrites that text. How much text a part
+holds depends on the support level (`supportLevel`, see `StorySegmenter`):
 
-- Paragraphs over `comic.story.max-part-chars` are cut at sentence boundaries.
-- Paragraphs under `comic.story.min-part-chars`, such as chapter headings, join a neighbour.
-- If there are more parts than `comic.story.max-panels`, the smallest neighbours merge.
-- The final paragraph stays separate and gets two panels when one is spare, to protect the ending.
+| Level       | One panel per                                                                  |
+| ----------- | ------------------------------------------------------------------------------ |
+| 1 (default) | paragraph. Paragraphs over `level1-max-part-chars` are cut at sentences.       |
+| 2           | 3 to 4 paragraphs (`level2-paragraphs-per-panel`).                             |
+| 3           | scene, split at `***`, `* * *`, extra blank lines and chapter headings, or 6 to 10 paragraphs when there are none. |
 
-The estimate is `parts x comic.llm.seconds-per-part + panels x comic.llm.seconds-per-panel`. The
+- At level 1, only a heading, or a short line of dialogue and its short reply
+  (`short-line-chars`), joins a neighbour.
+- Groups never cross a scene break, and are spread evenly across each scene.
+- The final part gets a second panel when there is room and it has more than one sentence. Its
+  text then appears once, under the last of the two.
+- Text that needs more than `comic.story.max-panels` panels is refused with a message asking for
+  chapters or a shorter piece. Paragraphs are never merged to make it fit.
+
+### What goes in a panel
+
+Each part makes small, strict-schema LLM calls rather than one big one, which suits small local
+models:
+
+1. **Panels.** Characters with pose, face, facing and (if on) a one-word `feeling`; bubbles; and a
+   `caption` only when time passes or the place changes. Bubbles of type `speech`, `shout` and
+   `whisper` must be words spoken in the text: `PanelValidator` checks each one as a substring of
+   the passage's quotations, ignoring curly vs. straight quotes, case and whitespace. If one fails,
+   the part is retried once with the problem explained, then any bubble still failing is dropped.
+   `thought` bubbles (what a character thinks, wants or plans) are drawn as clouds and not checked.
+2. **Notes** (if on). "What it means" notes for idioms, metaphors, sarcasm and old words. A note is
+   kept only if its `phrase` appears in the panel's `sourceText`.
+
+A known feeling word sets the face (`FeelingExpressions`), so the label and face never disagree.
+The frontend enforces the layout whatever the LLM chose: fixed figure slots, bubbles above their
+speakers, tails measured to end at the speaker's head, and speakers turned to face their listener.
+
+### Chapter bookends
+
+Every comic opens and closes the same way (`bookends` in the response):
+
+- **Who's who**: everyone who appears in the chapter, drawn from the sheet and named, plus one
+  plain "Where we are" line. It is built in code from the panels.
+- **What happened**: 2 to 4 short sentences, each tied to a panel shown as a thumbnail, from one
+  small recap call. The code then adds the closing line itself ("At the end, Mole feels proud.")
+  with a small figure of the main character, so the recap always ends with how they feel.
+- **Questions** (`questions`, off by default): one more small call writes 2 or 3 questions and
+  picks each answer from the chapter's characters or panel numbers. The code adds the wrong
+  choices, so every answer is a picture the reader has seen.
+
+`BookendsRules` checks everything the LLM suggests: panel numbers must exist, the main character
+must be in the chapter, and sentences stay short. `comic.bookends.*` limits how much of the
+chapter the calls see.
+
+The estimate is `parts x (seconds-per-part + seconds-per-notes-call) + panels x seconds-per-panel`
+`+ seconds-per-bookends-call (+ seconds-per-questions-call)`
+(+ `chunks x seconds-per-character-chunk` when no sheet is supplied)
+(all under `comic.llm`; the notes term only when notes are on, and retries are not counted). The
 defaults were measured with `qwen2.5-coder:7b` on one machine with the model already loaded, so
 retune them after changing model or hardware: the backend logs how long each part took.
 
@@ -85,10 +148,18 @@ retune them after changing model or hardware: the backend logs how long each par
 ```bash
 curl -X POST localhost:8080/api/comics/generate \
   -H "Content-Type: application/json" \
-  -d '{"text":"Mia found a map in the attic."}'
+  -d '{"text":"Mia found a map in the attic.","supportLevel":1}'
 
-curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf"
+curl -X POST localhost:8080/api/comics/generate -F "file=@story.pdf" -F "supportLevel=2"
 ```
+
+`POST /api/comics/characters` takes the same text or file and returns `{ characters, places }`.
+Pass that sheet back, edited, as `characterSheet` (a JSON object, or a JSON string form field in a
+multipart request) to `/estimate` and `/generate`.
+
+`supportLevel` (default 1), `feelingLabels` and `notes` (both default `true`) and `questions`
+(default `false`) are optional. When a toggle is off, that field is not requested from the LLM at
+all.
 
 An estimate response:
 
@@ -105,13 +176,32 @@ A generate response:
     {
       "panelNumber": 1,
       "scene": "indoor",
-      "caption": "A rainy Saturday.",
+      "caption": "",
       "characters": [
-        { "name": "Mia", "pose": "pointing", "expression": "surprised", "facing": "right" }
+        { "name": "Mia", "pose": "pointing", "expression": "surprised", "facing": "right", "feeling": "surprised" }
       ],
-      "dialogue": [{ "speaker": "Mia", "text": "Look at this!", "type": "shout" }]
+      "dialogue": [{ "speaker": "Mia", "text": "Look at this!", "type": "shout" }],
+      "sourceText": "Mia found a map in the attic. \"Look at this!\" she shouted.",
+      "notes": [],
+      "place": "The attic"
     }
-  ]
+  ],
+  "characters": [
+    {
+      "name": "Mia", "description": "Mia: a curious girl who loves maps.", "kind": "person",
+      "color": "#1b1b1f", "hat": "none", "hair": "ponytail", "accessory": "glasses",
+      "ears": "none", "tail": "none", "snout": "none", "added": false
+    }
+  ],
+  "places": [{ "name": "The attic", "description": "A dusty room at the top of the house.", "background": "room" }],
+  "bookends": {
+    "whosWho": { "characters": ["Mia"], "whereWeAre": "We are in the attic, on a rainy day." },
+    "recap": [
+      { "sentence": "Mia found a map.", "panelNumber": 1, "character": null, "expression": null },
+      { "sentence": "At the end, Mia feels excited.", "panelNumber": null, "character": "Mia", "expression": "excited" }
+    ],
+    "questions": []
+  }
 }
 ```
 
@@ -124,8 +214,16 @@ cd backend;  mvn test
 cd frontend; npm test -- --watch=false
 ```
 
-## Adding a pose or expression
+## Adding a pose, expression or other value
 
-Add the value in three places: the Java enum (`Pose` or `Expression`), the list in
-`comic.models.ts`, and the drawing in `stick-figure.poses.ts`. The LLM schema is built from the
-Java enums, so it picks up the change on its own.
+Add the value in three places: the Java enum, the matching list in `comic.models.ts`, and its
+drawing. The LLM schemas are built from the Java enums, so they pick up the change on its own.
+
+| Values                                                                | Java enum                         | Drawn in                        |
+| --------------------------------------------------------------------- | --------------------------------- | ------------------------------- |
+| Poses, expressions                                                    | `Pose`, `Expression`              | `stick-figure.poses.ts`         |
+| Dialogue types                                                        | `DialogueType`                    | `comic-panel.component.css`     |
+| Hats, hair, accessories, ears, tails, snouts                          | `Hat`, `Hair`, `Accessory`, `Ears`, `AnimalTail`, `Snout` | `stick-figure.features.ts` |
+| Place backgrounds                                                     | `Background`                      | `panel-background.component.ts` |
+
+A new expression should also get its feeling words in `FeelingExpressions`.

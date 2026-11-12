@@ -3,36 +3,34 @@ package com.comicsticks.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 
-import com.comicsticks.config.ComicProperties;
 import com.comicsticks.dto.CharacterDto;
 import com.comicsticks.dto.ComicStoryResponse;
 import com.comicsticks.dto.DialogueDto;
 import com.comicsticks.dto.DialogueType;
 import com.comicsticks.dto.Expression;
 import com.comicsticks.dto.Facing;
+import com.comicsticks.dto.NoteDto;
 import com.comicsticks.dto.PanelDto;
 import com.comicsticks.dto.Pose;
 import com.comicsticks.dto.Scene;
 import com.comicsticks.exception.ComicGenerationException;
+import com.comicsticks.support.TestProperties;
 
 class ComicStoryNormalizerTest {
 
-    private final ComicStoryNormalizer normalizer = new ComicStoryNormalizer(new ComicProperties(
-            new ComicProperties.Llm("u", "k", "m", Duration.ofSeconds(1), 1, 1, 1),
-            new ComicProperties.Story(1000, 3, 3000, 150, 80)));
+    private final ComicStoryNormalizer normalizer = new ComicStoryNormalizer(TestProperties.properties(3));
 
     private static final CharacterDto MIA =
-            new CharacterDto("Mia", Pose.WAVING, Expression.HAPPY, Facing.RIGHT);
+            new CharacterDto("Mia", Pose.WAVING, Expression.HAPPY, Facing.RIGHT, "happy");
 
     private static PanelDto panel(int number, List<CharacterDto> characters, List<DialogueDto> dialogue) {
-        return new PanelDto(number, Scene.PLAIN, "", characters, dialogue);
+        return new PanelDto(number, Scene.PLAIN, "", characters, dialogue, "", List.of());
     }
 
     @Test
@@ -66,20 +64,33 @@ class ComicStoryNormalizerTest {
     }
 
     @Test
-    void movesNarratorLinesIntoTheCaption() {
+    void dropsNarratorLinesBecauseTheNarrationIsAlreadyUnderThePanel() {
         var line = new DialogueDto("Narrator", "Years passed.", DialogueType.SPEECH);
-        var input = new PanelDto(1, Scene.PLAIN, "Later.", List.of(MIA), List.of(line));
+        var input = new PanelDto(1, Scene.PLAIN, "Later...", List.of(MIA), List.of(line), "Years passed.", null);
 
         PanelDto result = normalizer.normalize(new ComicStoryResponse("T", List.of(input))).panels().getFirst();
 
         assertThat(result.dialogue()).isEmpty();
-        assertThat(result.caption()).isEqualTo("Later. Years passed.");
+        assertThat(result.caption()).isEqualTo("Later...");
+        assertThat(result.sourceText()).isEqualTo("Years passed.");
+        assertThat(result.notes()).isEmpty();
+        assertThat(result.characters().getFirst().feeling()).isEqualTo("happy");
+    }
+
+    @Test
+    void dropsEmptyNotes() {
+        var input = new PanelDto(1, Scene.PLAIN, "", List.of(MIA), List.of(), "Her heart sank.",
+                List.of(new NoteDto(" Her heart sank ", " She felt sad. "), new NoteDto("", "x"), new NoteDto("y", null)));
+
+        PanelDto result = normalizer.normalize(new ComicStoryResponse("T", List.of(input))).panels().getFirst();
+
+        assertThat(result.notes()).containsExactly(new NoteDto("Her heart sank", "She felt sad."));
     }
 
     @Test
     void fillsNullsWithDefaults() {
-        var bare = new CharacterDto("Mia", null, null, null);
-        var input = new PanelDto(0, null, null, Collections.singletonList(bare), null);
+        var bare = new CharacterDto("Mia", null, null, null, null);
+        var input = new PanelDto(0, null, null, Collections.singletonList(bare), null, null, null);
 
         ComicStoryResponse story = normalizer.normalize(new ComicStoryResponse(null, List.of(input)));
 
@@ -88,6 +99,9 @@ class ComicStoryNormalizerTest {
         assertThat(result.scene()).isEqualTo(Scene.PLAIN);
         assertThat(result.caption()).isEmpty();
         assertThat(result.dialogue()).isEmpty();
+        assertThat(result.sourceText()).isEmpty();
+        assertThat(result.notes()).isEmpty();
+        assertThat(result.characters().getFirst().feeling()).isEmpty();
         assertThat(result.characters().getFirst().pose()).isEqualTo(Pose.STANDING);
     }
 

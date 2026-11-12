@@ -9,11 +9,64 @@
     <textarea
       id="story-text"
       rows="6"
-      placeholder="Mia found a map in the attic. &quot;Look at this!&quot; she shouted to Leo..."
+      placeholder='Mia found a map in the attic. "Look at this!" she shouted to Leo...'
       [value]="storyText()"
       [disabled]="file() !== null || loading()"
       (input)="onStoryInput($any($event.target).value)"
     ></textarea>
+
+    <fieldset class="settings">
+      <legend>Pictures</legend>
+      @for (level of supportLevels; track level.value) {
+        <label class="setting-choice">
+          <input
+            type="radio"
+            name="support-level"
+            [value]="level.value"
+            [checked]="supportLevel() === level.value"
+            [disabled]="loading()"
+            (change)="setSupportLevel(level.value)"
+          />
+          <span>
+            <strong>{{ level.label }}</strong> {{ level.description }}
+          </span>
+        </label>
+      }
+    </fieldset>
+
+    <fieldset class="settings">
+      <legend>Help with reading</legend>
+      <label class="setting-choice">
+        <input
+          type="checkbox"
+          name="feeling-labels"
+          [checked]="feelingLabels()"
+          [disabled]="loading()"
+          (change)="setToggle('feelingLabels', $any($event.target).checked)"
+        />
+        <span><strong>Feeling labels</strong> A word for how each character feels.</span>
+      </label>
+      <label class="setting-choice">
+        <input
+          type="checkbox"
+          name="notes"
+          [checked]="notes()"
+          [disabled]="loading()"
+          (change)="setToggle('notes', $any($event.target).checked)"
+        />
+        <span><strong>What it means</strong> Explains sayings and tricky words.</span>
+      </label>
+      <label class="setting-choice">
+        <input
+          type="checkbox"
+          name="questions"
+          [checked]="questions()"
+          [disabled]="loading()"
+          (change)="setToggle('questions', $any($event.target).checked)"
+        />
+        <span><strong>Questions</strong> A few picture questions at the end.</span>
+      </label>
+    </fieldset>
 
     <div class="composer-actions">
       <input
@@ -54,13 +107,38 @@
         <app-stick-figure class="loading-figure" pose="running" expression="happy" name="Artist" />
         <p>Inking your panels. This should take {{ estimatedTime() }}.</p>
       </div>
+    } @else if (finding()) {
+      <div class="loading">
+        <app-stick-figure class="loading-figure" pose="thinking" expression="happy" name="Reader" />
+        <p>Reading the story to find who is in it...</p>
+      </div>
     } @else if (estimate(); as plan) {
+      @if (!sheet()) {
+        <div class="confirm">
+          <p>
+            This will take <strong>{{ estimatedTime() }}</strong
+            >. The story splits into {{ plan.parts }} {{ plan.parts === 1 ? 'part' : 'parts' }}, for
+            up to {{ plan.panels }} {{ plan.panels === 1 ? 'panel' : 'panels' }}. First, the
+            characters are found so you can check how they look.
+          </p>
+          <div class="confirm-actions">
+            <button type="button" class="button button-secondary" (click)="cancelEstimate()">
+              Cancel
+            </button>
+            <button type="button" class="button" (click)="findCharacters()">
+              Find the characters
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  @if (sheet(); as reviewed) {
+    @if (!loading()) {
+      <app-character-sheet [sheet]="reviewed" (sheetChange)="sheet.set($event)" />
       <div class="confirm">
-        <p>
-          This will take <strong>{{ estimatedTime() }}</strong>. The story splits into
-          {{ plan.parts }} {{ plan.parts === 1 ? 'part' : 'parts' }}, for up to
-          {{ plan.panels }} {{ plan.panels === 1 ? 'panel' : 'panels' }}.
-        </p>
+        <p>When everyone looks right, draw the comic.</p>
         <div class="confirm-actions">
           <button type="button" class="button button-secondary" (click)="cancelEstimate()">
             Cancel
@@ -69,7 +147,7 @@
         </div>
       </div>
     }
-  </div>
+  }
 
   @if (story(); as comic) {
     <section class="comic" aria-label="Your comic">
@@ -84,92 +162,45 @@
       <p class="hint">Click any text to edit it. Hover over a figure to change its pose or face.</p>
 
       <div class="comic-grid">
+        @if (comic.bookends; as bookends) {
+          <app-whos-who
+            [characters]="bookends.whosWho.characters"
+            [whereWeAre]="bookends.whosWho.whereWeAre"
+            [designs]="comic.characters"
+          />
+        }
         @for (panel of comic.panels; track $index; let panelIndex = $index) {
-          <article
-            class="panel"
-            [class]="'scene-' + panel.scene"
-            [attr.aria-label]="'Panel ' + panel.panelNumber"
-          >
-            <p
-              class="caption"
-              contenteditable="true"
-              aria-label="Panel caption"
-              [appEditable]="panel.caption"
-              (edited)="setCaption(panelIndex, $event)"
-            ></p>
-
-            <div class="bubbles">
-              @for (line of panel.dialogue; track $index; let lineIndex = $index) {
-                @let layout = bubbleLayout(panel, line);
-                <p
-                  class="bubble"
-                  [class]="'bubble-' + line.type"
-                  contenteditable="true"
-                  [attr.aria-label]="line.speaker + ' says'"
-                  [style.width.%]="layout.width"
-                  [style.margin-left.%]="layout.left"
-                  [style.--tail-x]="layout.tail"
-                  [appEditable]="line.text"
-                  (edited)="setDialogue(panelIndex, lineIndex, $event)"
-                ></p>
-              }
-            </div>
-
-            <div class="stage">
-              @for (character of panel.characters; track $index; let characterIndex = $index) {
-                <div class="actor">
-                  <app-stick-figure
-                    class="figure"
-                    [pose]="character.pose"
-                    [expression]="character.expression"
-                    [facing]="character.facing"
-                    [color]="colorOf(character.name)"
-                    [name]="character.name"
-                  />
-                  <span
-                    class="actor-name"
-                    contenteditable="true"
-                    spellcheck="false"
-                    aria-label="Character name"
-                    [appEditable]="character.name"
-                    (edited)="renameCharacter(character.name, $event)"
-                  ></span>
-                  <div class="actor-controls">
-                    <select
-                      [attr.aria-label]="character.name + ' pose'"
-                      (change)="
-                        updateCharacter(panelIndex, characterIndex, {
-                          pose: $any($event.target).value,
-                        })
-                      "
-                    >
-                      @for (pose of poses; track pose) {
-                        <option [value]="pose" [selected]="pose === character.pose">
-                          {{ pose }}
-                        </option>
-                      }
-                    </select>
-                    <select
-                      [attr.aria-label]="character.name + ' expression'"
-                      (change)="
-                        updateCharacter(panelIndex, characterIndex, {
-                          expression: $any($event.target).value,
-                        })
-                      "
-                    >
-                      @for (expression of expressions; track expression) {
-                        <option [value]="expression" [selected]="expression === character.expression">
-                          {{ expression }}
-                        </option>
-                      }
-                    </select>
-                  </div>
-                </div>
-              }
-            </div>
-          </article>
+          <app-comic-panel
+            [panel]="panel"
+            [colorOf]="colorFn"
+            [designs]="comic.characters"
+            [places]="comic.places"
+            (captionChange)="setCaption(panelIndex, $event)"
+            (dialogueChange)="setDialogue(panelIndex, $event.index, $event.text)"
+            (characterChange)="updateCharacter(panelIndex, $event.index, $event.change)"
+            (rename)="renameCharacter($event.from, $event.to)"
+          />
         }
       </div>
+
+      @if (comic.bookends; as bookends) {
+        <div class="chapter-end">
+          <app-recap
+            [recap]="bookends.recap"
+            [panels]="comic.panels"
+            [designs]="comic.characters"
+            [places]="comic.places"
+          />
+          @if (bookends.questions.length) {
+            <app-questions
+              [questions]="bookends.questions"
+              [panels]="comic.panels"
+              [designs]="comic.characters"
+              [places]="comic.places"
+            />
+          }
+        </div>
+      }
     </section>
   }
 </main>
